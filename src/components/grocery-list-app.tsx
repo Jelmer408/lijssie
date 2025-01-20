@@ -44,7 +44,6 @@ import { aiService } from '@/services/ai-service'
 import * as offlineStore from '@/lib/offline-store';
 import { SavedListsModal, SaveCurrentListModal } from '@/components/saved-lists';
 import { PreferencesModal } from '@/components/predictions';
-import { SupermarketStories } from './supermarket-stories/supermarket-stories';
 import { SaleRecommendations } from './sales/SaleRecommendations';
 
 const defaultCategory: Category = 'Overig';

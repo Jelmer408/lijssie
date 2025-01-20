@@ -98,23 +98,23 @@ export function SaleRecommendations({ groceryList, householdName }: SaleRecommen
         if (itemsNeedingRecs.length > 0) {
           // Use hybrid search for recommendations
           const newRecs = await hybridSearchService.searchSaleItems(itemsNeedingRecs);
-          
-          // Group new recommendations
-          newRecs.forEach(rec => {
-            const key = rec.groceryItem.id;
-            groupedRecs[key] = {
-              groceryItem: rec.groceryItem,
+            
+            // Group new recommendations
+            newRecs.forEach(rec => {
+              const key = rec.groceryItem.id;
+                groupedRecs[key] = {
+                  groceryItem: rec.groceryItem,
               recommendations: rec.recommendations
             };
 
             // Cache recommendations
-            supabase
-              .from('sale_recommendations')
-              .upsert({
+                supabase
+                  .from('sale_recommendations')
+                  .upsert({
                 grocery_item_id: key,
                 recommendations: rec.recommendations,
-                created_at: new Date().toISOString()
-              })
+                    created_at: new Date().toISOString()
+                  })
               .then(({ error }) => {
                 if (error) console.error('Error caching recommendations:', error);
               });
