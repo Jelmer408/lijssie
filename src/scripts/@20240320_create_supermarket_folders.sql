@@ -26,18 +26,15 @@ CREATE POLICY "Enable read access for all users"
 ON supermarket_folders FOR SELECT 
 USING (true);
 
-CREATE POLICY "Enable insert for service role" 
-ON supermarket_folders FOR INSERT 
-WITH CHECK (auth.jwt() IS NULL OR auth.jwt()->>'role' = 'service_role');
-
-CREATE POLICY "Enable update for service role" 
-ON supermarket_folders FOR UPDATE
-USING (auth.jwt() IS NULL OR auth.jwt()->>'role' = 'service_role')
-WITH CHECK (auth.jwt() IS NULL OR auth.jwt()->>'role' = 'service_role');
-
-CREATE POLICY "Enable delete for service role" 
-ON supermarket_folders FOR DELETE 
-USING (auth.jwt() IS NULL OR auth.jwt()->>'role' = 'service_role');
+-- Allow all operations for service role
+CREATE POLICY "Enable all operations for service role" 
+ON supermarket_folders 
+FOR ALL 
+USING (
+  auth.role() = 'service_role' OR 
+  auth.jwt()->>'role' = 'service_role' OR 
+  (SELECT current_setting('request.jwt.claims', true)::json->>'role') = 'service_role'
+);
 
 -- Create index for faster queries
 CREATE INDEX IF NOT EXISTS supermarket_folders_valid_until_idx ON supermarket_folders (valid_until);
