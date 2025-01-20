@@ -200,11 +200,26 @@ export function SaleRecommendations({ groceryList, householdName }: SaleRecommen
         completed: false,
         category: 'Overig',
       }]);
+      
+      // Filter out irrelevant matches based on similarity
       if (results.length > 0) {
-        setSearchResults(results[0].recommendations);
+        const relevantResults = results[0].recommendations.filter(result => {
+          // Convert both strings to lowercase for comparison
+          const searchTerm = query.toLowerCase();
+          const productName = result.saleItem.productName.toLowerCase();
+          
+          // Check if the product name contains the search term
+          // or if the search term contains the product name
+          return productName.includes(searchTerm) || searchTerm.includes(productName);
+        });
+        
+        setSearchResults(relevantResults);
+      } else {
+        setSearchResults([]);
       }
     } catch (error) {
       console.error('Error searching offers:', error);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
