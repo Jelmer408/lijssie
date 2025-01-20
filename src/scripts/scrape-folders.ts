@@ -30,6 +30,25 @@ const SUPERMARKETS: SupermarketConfig[] = [
   { name: 'Plus', urlName: 'plus' },
 ];
 
+// Function to clean up old folders
+function cleanupOldFolders(): void {
+  console.log('Cleaning up old folders...');
+  const folderDir = path.join(process.cwd(), 'public', 'supermarkets', 'folders');
+  
+  if (fs.existsSync(folderDir)) {
+    const files = fs.readdirSync(folderDir);
+    for (const file of files) {
+      if (file.endsWith('.pdf')) {
+        const filePath = path.join(folderDir, file);
+        fs.unlinkSync(filePath);
+        console.log(`Deleted old folder: ${file}`);
+      }
+    }
+  }
+  
+  console.log('Old folders cleanup completed');
+}
+
 async function downloadFolder(supermarket: SupermarketConfig): Promise<void> {
   try {
     const now = new Date();
@@ -83,14 +102,17 @@ async function downloadFolder(supermarket: SupermarketConfig): Promise<void> {
 }
 
 async function main() {
-  console.log('Starting folder downloads...');
+  console.log('Starting folder processing...');
+  
+  // Clean up old folders before downloading new ones
+  cleanupOldFolders();
   
   for (const supermarket of SUPERMARKETS) {
     await downloadFolder(supermarket);
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
   
-  console.log('Folder downloads completed');
+  console.log('Folder processing completed');
 }
 
 main().catch(console.error);
