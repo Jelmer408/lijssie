@@ -363,7 +363,29 @@ export function GroceryListAppComponent() {
     };
     
     loadCategoryOrder();
-  }, []);
+
+    // Add real-time subscription for category order changes
+    const channel = supabase
+      .channel('category_order_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'category_order',
+          filter: household?.id ? `household_id=eq.${household.id}` : undefined
+        },
+        async () => {
+          // Reload category order when changes occur
+          await loadCategoryOrder();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [household?.id]);
 
   useEffect(() => {
     if (!household?.id) return;
@@ -1971,14 +1993,23 @@ export function GroceryListAppComponent() {
                     values={orderedCategories} 
                     onReorder={async (newOrder) => {
                       if (!isReorderMode) return;
-                      setOrderedCategories(newOrder);
-                      try {
-                        await categoryService.updateCategoryOrder(newOrder);
-                      } catch (error) {
-                        console.error('Error saving category order:', error);
+                      
+                      // Only update if the order actually changed
+                      if (JSON.stringify(newOrder) !== JSON.stringify(orderedCategories)) {
+                        setOrderedCategories(newOrder);
+                        try {
+                          await categoryService.updateCategoryOrder(newOrder);
+                        } catch (error) {
+                          console.error('Error saving category order:', error);
+                          // Revert on error
+                          setOrderedCategories(orderedCategories);
+                        }
                       }
                     }}
-                    className="space-y-4"
+                    className={cn(
+                      "space-y-4",
+                      isReorderMode && "touch-none"
+                    )}
                   >
                     {orderedCategories.map((category) => {
                       const categoryItems = activeItems.filter(item => item.category === category);
@@ -1991,10 +2022,17 @@ export function GroceryListAppComponent() {
                           dragListener={isReorderMode}
                           className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100"
                           onPointerDown={(e: React.PointerEvent) => {
-                            if (!isReorderMode) {
+                            if (isReorderMode) {
+                              e.stopPropagation();
+                              e.preventDefault();
+                            }
+                          }}
+                          onTouchStart={(e: React.TouchEvent) => {
+                            if (isReorderMode) {
                               e.stopPropagation();
                             }
                           }}
+                          drag={isReorderMode}
                         >
                           <div className={cn(
                             "py-1.5 px-2.5 flex items-center gap-2 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl transition-colors duration-200",
