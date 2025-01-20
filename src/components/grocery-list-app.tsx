@@ -2744,27 +2744,7 @@ export function GroceryListAppComponent() {
       {/* Add this new Dialog import if not already present */}
       <Dialog open={isHouseholdModalOpen} onOpenChange={setIsHouseholdModalOpen}>
         <DialogTrigger asChild>
-          {activeView !== 'trends' && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-10 h-10 rounded-xl bg-white/80 backdrop-blur-sm border border-gray-100 shadow-sm flex items-center justify-center hover:bg-gray-50 transition-colors duration-200"
-            >
-              {user?.user_metadata?.avatar_url ? (
-                <img
-                  src={user.user_metadata.avatar_url}
-                  alt={user.user_metadata?.full_name || 'User'}
-                  className="w-6 h-6 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                  <span className="text-sm font-medium text-blue-600">
-                    {user?.user_metadata?.full_name?.[0]?.toUpperCase() || '?'}
-                  </span>
-                </div>
-              )}
-            </motion.button>
-          )}
+         
         </DialogTrigger>
         <DialogContent className="sm:max-w-md bg-white rounded-3xl border border-gray-100 shadow-xl">
           <DialogHeader>

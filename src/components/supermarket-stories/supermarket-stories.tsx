@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
+import { createPortal } from 'react-dom';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 // Initialize pdfjs worker with local file from public directory
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+
+// Function to get next Sunday's date
+function getNextSunday() {
+  const today = new Date();
+  const daysUntilSunday = 7 - today.getDay();
+  const nextSunday = new Date(today);
+  nextSunday.setDate(today.getDate() + daysUntilSunday);
+  return nextSunday;
+}
 
 interface SupermarketStory {
   id: string;
@@ -14,6 +24,147 @@ interface SupermarketStory {
   imageUrl: string;
   title: string;
   validUntil: string;
+}
+
+// Story Viewer Component
+function StoryViewer({ story, onClose, currentPage, numPages, isLoading, pageWidth, pageHeight, handleDocumentLoadSuccess, handleNext, handlePrevious, getPdfPath }: {
+  story: SupermarketStory;
+  onClose: () => void;
+  currentPage: number;
+  numPages: number | null;
+  isLoading: boolean;
+  pageWidth: number;
+  pageHeight: number;
+  handleDocumentLoadSuccess: ({ numPages }: { numPages: number }) => void;
+  handleNext: () => void;
+  handlePrevious: () => void;
+  getPdfPath: (supermarket: string) => string;
+}) {
+  // Get next Sunday's date
+  const validUntilDate = getNextSunday();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: '100dvh',
+        width: '100vw',
+        zIndex: 999999,
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {/* Story Content */}
+      <div className="relative w-full h-full bg-black">
+        {/* Story Header */}
+        <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between p-4 pt-safe bg-gradient-to-b from-black/50 to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 backdrop-blur-sm flex items-center justify-center">
+              <img
+                src={story.imageUrl}
+                alt={story.title}
+                className="w-5 h-5 object-contain"
+              />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white">
+                {story.title}
+              </h3>
+              <p className="text-xs text-white/80">
+                Geldig t/m {validUntilDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="p-1 rounded-full hover:bg-white/10 transition-colors duration-200 relative z-50"
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+        </div>
+
+        {/* Story Image/PDF */}
+        <div className="w-full h-full flex items-center justify-center bg-black pb-safe">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
+          <Document
+            file={getPdfPath(story.supermarket)}
+            onLoadSuccess={handleDocumentLoadSuccess}
+            onLoadError={(error) => console.error('Error loading PDF:', error)}
+            loading={null}
+          >
+            <Page
+              pageNumber={currentPage + 1}
+              width={pageWidth}
+              height={pageHeight - 120}
+              scale={1.0}
+              renderMode="canvas"
+              loading={null}
+              renderTextLayer={false}
+              renderAnnotationLayer={false}
+            />
+          </Document>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 p-2 pt-safe">
+          {numPages && [...Array(numPages)].map((_, index) => (
+            <div
+              key={index}
+              className="h-0.5 flex-1 bg-white/30 overflow-hidden"
+            >
+              <motion.div
+                key={`progress-${currentPage}-${index}`}
+                initial={{ width: index < currentPage ? "100%" : "0%" }}
+                animate={{ width: index <= currentPage ? "100%" : "0%" }}
+                transition={{ 
+                  duration: index === currentPage ? 5 : 0,
+                  ease: "linear"
+                }}
+                onAnimationComplete={() => {
+                  if (index === currentPage) handleNext();
+                }}
+                className="h-full bg-white"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Navigation Areas */}
+        <div className="absolute inset-0 z-20 flex touch-none">
+          <button
+            className="w-1/2 h-full cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevious();
+            }}
+          />
+          <button
+            className="w-1/2 h-full cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNext();
+            }}
+          />
+        </div>
+      </div>
+    </motion.div>
+  );
 }
 
 export function SupermarketStories() {
@@ -139,6 +290,7 @@ export function SupermarketStories() {
   const handleStoryClick = (story: SupermarketStory) => {
     setSelectedStory(story);
     setCurrentPage(0);
+    setIsLoading(true);
   };
 
   const handleClose = () => {
@@ -147,6 +299,7 @@ export function SupermarketStories() {
     }
     setSelectedStory(null);
     setCurrentPage(0);
+    setNumPages(null);
   };
 
   const handleDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
@@ -171,19 +324,25 @@ export function SupermarketStories() {
     }
   };
 
-  // Remove the effect that manipulates DOM
+  // Lock body scroll when story is open
   useEffect(() => {
     if (selectedStory) {
-      // Prevent body scroll
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
     } else {
-      // Restore body scroll
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
     }
 
-    // Cleanup function
     return () => {
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
     };
   }, [selectedStory]);
 
@@ -223,123 +382,23 @@ export function SupermarketStories() {
         </div>
       </div>
 
-      {/* Story Viewer */}
-      <AnimatePresence>
-        {selectedStory && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] bg-black"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: '100dvh', // Use dynamic viewport height for iOS
-            }}
-          >
-            {/* Story Content */}
-            <div className="relative w-full h-full bg-black">
-              {/* Story Header */}
-              <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between p-4 pt-safe bg-gradient-to-b from-black/50 to-transparent">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                    <img
-                      src={selectedStory.imageUrl}
-                      alt={selectedStory.title}
-                      className="w-5 h-5 object-contain"
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">
-                      {selectedStory.title}
-                    </h3>
-                    <p className="text-xs text-white/80">
-                      Geldig t/m {new Date(selectedStory.validUntil).toLocaleDateString('nl-NL')}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleClose}
-                  className="p-1 rounded-full hover:bg-white/10 transition-colors duration-200 relative z-50"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                >
-                  <X className="w-6 h-6 text-white" />
-                </button>
-              </div>
-
-              {/* Story Image/PDF */}
-              <div className="w-full h-full flex items-center justify-center bg-black pb-safe">
-                {selectedStory && (
-                  <>
-                    {isLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      </div>
-                    )}
-                    <Document
-                      file={getPdfPath(selectedStory.supermarket)}
-                      onLoadSuccess={handleDocumentLoadSuccess}
-                      onLoadError={(error) => console.error('Error loading PDF:', error)}
-                      loading={null}
-                    >
-                      <Page
-                        pageNumber={currentPage + 1}
-                        width={pageWidth}
-                        height={pageHeight - 120}
-                        scale={1.0}
-                        renderMode="canvas"
-                        loading={null}
-                        renderTextLayer={false}
-                        renderAnnotationLayer={false}
-                      />
-                    </Document>
-                  </>
-                )}
-              </div>
-
-              {/* Progress Bar */}
-              <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 p-2 pt-safe">
-                {numPages && [...Array(numPages)].map((_, index) => (
-                  <div
-                    key={index}
-                    className="h-0.5 flex-1 bg-white/30 overflow-hidden"
-                  >
-                    <motion.div
-                      key={`progress-${currentPage}-${index}`}
-                      initial={{ width: index < currentPage ? "100%" : "0%" }}
-                      animate={{ width: index <= currentPage ? "100%" : "0%" }}
-                      transition={{ 
-                        duration: index === currentPage ? 5 : 0,
-                        ease: "linear"
-                      }}
-                      onAnimationComplete={() => {
-                        if (index === currentPage) handleNext();
-                      }}
-                      className="h-full bg-white"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {/* Navigation Areas */}
-              <div className="absolute inset-0 z-25 flex pointer-events-none">
-                <button
-                  className="w-1/2 h-full pointer-events-auto"
-                  onClick={handlePrevious}
-                />
-                <button
-                  className="w-1/2 h-full pointer-events-auto"
-                  onClick={handleNext}
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Story Viewer Portal */}
+      {selectedStory && createPortal(
+        <StoryViewer
+          story={selectedStory}
+          onClose={handleClose}
+          currentPage={currentPage}
+          numPages={numPages}
+          isLoading={isLoading}
+          pageWidth={pageWidth}
+          pageHeight={pageHeight}
+          handleDocumentLoadSuccess={handleDocumentLoadSuccess}
+          handleNext={handleNext}
+          handlePrevious={handlePrevious}
+          getPdfPath={getPdfPath}
+        />,
+        document.body
+      )}
     </>
   );
 } 
