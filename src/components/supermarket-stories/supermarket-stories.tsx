@@ -171,33 +171,19 @@ export function SupermarketStories() {
     }
   };
 
-  // Add effect to handle body scroll and nav bar visibility
+  // Remove the effect that manipulates DOM
   useEffect(() => {
     if (selectedStory) {
       // Prevent body scroll
       document.body.style.overflow = 'hidden';
-      // Hide navigation bar
-      const navbar = document.querySelector('nav');
-      if (navbar) {
-        navbar.style.display = 'none';
-      }
     } else {
       // Restore body scroll
       document.body.style.overflow = '';
-      // Show navigation bar
-      const navbar = document.querySelector('nav');
-      if (navbar) {
-        navbar.style.display = '';
-      }
     }
 
     // Cleanup function
     return () => {
       document.body.style.overflow = '';
-      const navbar = document.querySelector('nav');
-      if (navbar) {
-        navbar.style.display = '';
-      }
     };
   }, [selectedStory]);
 
@@ -244,12 +230,20 @@ export function SupermarketStories() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black"
+            className="fixed inset-0 z-[9999] bg-black"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: '100dvh', // Use dynamic viewport height for iOS
+            }}
           >
             {/* Story Content */}
             <div className="relative w-full h-full bg-black">
               {/* Story Header */}
-              <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-gradient-to-b from-black/50 to-transparent">
+              <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between p-4 pt-safe bg-gradient-to-b from-black/50 to-transparent">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 backdrop-blur-sm flex items-center justify-center">
                     <img
@@ -278,7 +272,7 @@ export function SupermarketStories() {
               </div>
 
               {/* Story Image/PDF */}
-              <div className="w-full h-full flex items-center justify-center bg-black">
+              <div className="w-full h-full flex items-center justify-center bg-black pb-safe">
                 {selectedStory && (
                   <>
                     {isLoading && (
@@ -295,7 +289,7 @@ export function SupermarketStories() {
                       <Page
                         pageNumber={currentPage + 1}
                         width={pageWidth}
-                        height={pageHeight - 120} // Subtract space for header and progress bar
+                        height={pageHeight - 120}
                         scale={1.0}
                         renderMode="canvas"
                         loading={null}
@@ -308,7 +302,7 @@ export function SupermarketStories() {
               </div>
 
               {/* Progress Bar */}
-              <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 p-2">
+              <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 p-2 pt-safe">
                 {numPages && [...Array(numPages)].map((_, index) => (
                   <div
                     key={index}

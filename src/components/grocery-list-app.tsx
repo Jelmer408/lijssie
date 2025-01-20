@@ -2379,12 +2379,12 @@ export function GroceryListAppComponent() {
             </div>
 
             {/* Bottom navbar */}
-            <motion.div className="fixed bottom-3 left-4 right-4 bg-white/80 backdrop-blur-xl border border-gray-100/20 shadow-2xl rounded-full z-50">
+            <motion.div className="fixed bottom-5 left-4 right-4 bg-white/80 backdrop-blur-xl border border-gray-100/20 shadow-2xl rounded-full z-50">
               <div className="max-w-md mx-auto">
-                <div className="flex justify-around items-center px-4 py-1">
+                <div className="flex justify-around items-center px-4 py-2">
                   <motion.button
                     onClick={() => setActiveView('list')}
-                    className={`relative flex items-center justify-center p-1.5 transition-all duration-300 ${
+                    className={`relative flex items-center justify-center p-2 transition-all duration-300 ${
                       activeView === 'list' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
                     }`}
                     whileHover={{ scale: 1.05 }}
@@ -2397,12 +2397,12 @@ export function GroceryListAppComponent() {
                         transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                       />
                     )}
-                    <span className="relative text-base">📋</span>
+                    <span className="relative text-lg">📋</span>
                   </motion.button>
 
                   <motion.button
                     onClick={() => setActiveView('trends')}
-                    className={`relative flex items-center justify-center p-1.5 transition-all duration-300 ${
+                    className={`relative flex items-center justify-center p-2 transition-all duration-300 ${
                       activeView === 'trends' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
                     }`}
                     whileHover={{ scale: 1.05 }}
@@ -2415,12 +2415,12 @@ export function GroceryListAppComponent() {
                         transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                       />
                     )}
-                    <span className="relative text-base">🏷️</span>
+                    <span className="relative text-lg">🏷️</span>
                   </motion.button>
 
                   <motion.button
                     onClick={() => setActiveView('meals')}
-                    className={`relative flex items-center justify-center p-1.5 transition-all duration-300 ${
+                    className={`relative flex items-center justify-center p-2 transition-all duration-300 ${
                       activeView === 'meals' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
                     }`}
                     whileHover={{ scale: 1.05 }}
@@ -2433,16 +2433,16 @@ export function GroceryListAppComponent() {
                         transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                       />
                     )}
-                    <span className="relative text-base">🍽️</span>
+                    <span className="relative text-lg">🍽️</span>
                   </motion.button>
 
                   <motion.button
                     onClick={() => navigate('/koken')}
-                    className="relative flex items-center justify-center p-1.5 transition-all duration-300 text-gray-400 hover:text-gray-600"
+                    className="relative flex items-center justify-center p-2 transition-all duration-300 text-gray-400 hover:text-gray-600"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <span className="relative text-base">👨‍🍳</span>
+                    <span className="relative text-lg">👨‍🍳</span>
                   </motion.button>
                 </div>
               </div>
