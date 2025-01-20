@@ -2026,7 +2026,14 @@ export function GroceryListAppComponent() {
                 </div>
 
                 {/* Purchased Items Section */}
-                {purchasedItems.length > 0 && (
+                {purchasedItems
+                  .filter(item => {
+                    if (!item.created_at) return false;
+                    const itemDate = new Date(item.created_at);
+                    const today = new Date();
+                    return itemDate.toDateString() === today.toDateString();
+                  })
+                  .length > 0 && (
                   <motion.div 
                     className="bg-white/80 backdrop-blur-sm p-5 rounded-2xl shadow-lg border border-gray-100 mt-8"
                     initial={{ opacity: 0, y: 20 }}
