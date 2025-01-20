@@ -267,8 +267,10 @@ export function SaleRecommendations({ groceryList, householdName }: SaleRecommen
     <div className="w-full max-w-md mx-auto px-4">
       {/* Search Bar */}
       <div className="mb-6">
-        <div className="relative flex items-center w-full group">
-          <Search className="h-5 w-5 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-300" strokeWidth={2} />
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10">
+            <Search className="h-5 w-5 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-300" strokeWidth={2} />
+          </div>
           <input
             type="text"
             value={searchQuery}
@@ -276,23 +278,23 @@ export function SaleRecommendations({ groceryList, householdName }: SaleRecommen
               setSearchQuery(e.target.value);
               handleSearch(e.target.value);
             }}
-            placeholder="Zoek in aanbiedingen..."
-            className="w-full pl-8 pr-4 py-2.5 bg-gray-100/80 backdrop-blur-sm rounded-xl border border-gray-200/50 focus:outline-none focus:border-gray-300/50 transition-colors duration-300 placeholder:text-gray-400 text-base"
+            placeholder="Zoek in alle aanbiedingen..."
+            className="w-full pl-12 pr-12 py-3.5 bg-white/80 hover:bg-white/90 focus:bg-white backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-sm text-[15px] text-gray-900 placeholder-gray-500 outline-none ring-0 focus:ring-2 ring-offset-0 ring-blue-500/20 transition-all duration-300"
           />
           {searchQuery && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setSearchResults([]);
-              }}
-              className="absolute inset-y-0 right-4 flex items-center"
-            >
-              <div className="p-1 rounded-full hover:bg-gray-100/80 transition-colors duration-200">
+            <div className="absolute inset-y-0 right-4 flex items-center">
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchResults([]);
+                }}
+                className="p-1.5 rounded-full hover:bg-gray-100/80 transition-colors duration-200"
+              >
                 <X className="h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors duration-200" />
-              </div>
-            </button>
+              </button>
+            </div>
           )}
-          <div className="absolute inset-0 -z-10 rounded-2xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500" />
+          <div className="absolute inset-0 -z-10 rounded-2xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500 pointer-events-none" />
         </div>
       </div>
 
