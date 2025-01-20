@@ -1,0 +1,5 @@
+project_id = "boodschappenapp"
+
+[functions]
+[functions.push-notification]
+verify_jwt = false

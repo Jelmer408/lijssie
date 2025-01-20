@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "short_name": "Lijssie",
+  "name": "Lijssie - Slimme Boodschappenlijst",
+  "description": "Deel je boodschappenlijstje en maaltijdvoorstellen met je huisgenoten. Krijg meldingen wanneer iemand onderweg is naar de winkel.",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "384x384",
+      "purpose": "any"
+    },
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Boodschappenlijst",
+      "url": "/",
+      "icons": [{ "src": "logo.png", "sizes": "192x192" }]
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#F9FAFB",
+  "background_color": "#F9FAFB",
+  "prefer_related_applications": false,
+  "categories": ["shopping", "lifestyle", "productivity"],
+  "screenshots": [
+    {
+      "src": "logo.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Homescreen van Lijssie"
+    }
+  ]
+} 
