@@ -27,6 +27,21 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
 
   // Filter out completed items
   const activeItems = items.filter(item => !item.completed);
+  
+  // Track selected items
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(activeItems.map(item => item.id)));
+
+  const toggleItem = (itemId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -38,10 +53,10 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
       return;
     }
 
-    if (activeItems.length === 0) {
+    if (selectedItems.size === 0) {
       toast({
         title: "Geen items",
-        description: "Er zijn geen items om op te slaan.",
+        description: "Selecteer ten minste één product om op te slaan.",
         variant: "destructive"
       });
       return;
@@ -58,10 +73,12 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
 
     try {
       setIsSaving(true);
+      const selectedItemsList = activeItems.filter(item => selectedItems.has(item.id));
+      
       await savedListsService.createList({
         name: name.trim(),
         description: description.trim(),
-        items: activeItems.map(item => ({
+        items: selectedItemsList.map(item => ({
           name: item.name,
           category: item.category,
           quantity: item.quantity || '1',
@@ -130,7 +147,7 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
 
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
-              Items om op te slaan ({activeItems.length})
+              Items om op te slaan ({selectedItems.size}/{activeItems.length})
             </Label>
             <ScrollArea className="h-[200px] w-full rounded-xl border border-gray-100 bg-gray-50/50 p-4">
               <AnimatePresence>
@@ -144,6 +161,12 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
                         exit={{ opacity: 0, y: -10 }}
                         className="flex items-center gap-2 p-2 rounded-lg bg-white border border-gray-100 shadow-sm"
                       >
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(item.id)}
+                          onChange={() => toggleItem(item.id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/20"
+                        />
                         <span className="text-lg">{item.emoji}</span>
                         <span className="text-sm text-gray-700">{item.name}</span>
                         {item.quantity && (
@@ -175,7 +198,7 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
             </Button>
             <Button
               onClick={handleSave}
-              disabled={isSaving || activeItems.length === 0}
+              disabled={isSaving || selectedItems.size === 0}
               className="rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700"
             >
               {isSaving ? (

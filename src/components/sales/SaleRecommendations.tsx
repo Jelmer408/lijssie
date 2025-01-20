@@ -99,22 +99,22 @@ export function SaleRecommendations({ groceryList, householdName }: SaleRecommen
           // Use hybrid search for recommendations
           const newRecs = await hybridSearchService.searchSaleItems(itemsNeedingRecs);
             
-            // Group new recommendations
-            newRecs.forEach(rec => {
-              const key = rec.groceryItem.id;
-                groupedRecs[key] = {
-                  groceryItem: rec.groceryItem,
+          // Group new recommendations
+          newRecs.forEach(rec => {
+            const key = rec.groceryItem.id;
+            groupedRecs[key] = {
+              groceryItem: rec.groceryItem,
               recommendations: rec.recommendations
             };
 
             // Cache recommendations
-                supabase
-                  .from('sale_recommendations')
-                  .upsert({
+            supabase
+              .from('sale_recommendations')
+              .upsert({
                 grocery_item_id: key,
                 recommendations: rec.recommendations,
-                    created_at: new Date().toISOString()
-                  })
+                created_at: new Date().toISOString()
+              })
               .then(({ error }) => {
                 if (error) console.error('Error caching recommendations:', error);
               });
@@ -124,8 +124,11 @@ export function SaleRecommendations({ groceryList, householdName }: SaleRecommen
         setRecommendations(groupedRecs);
         setLastProcessedIds(currentIds);
         
-        // Automatically expand items with recommendations
-        setExpandedItems(new Set(Object.keys(groupedRecs)));
+        // Only expand the first product that has recommendations
+        const firstItemWithRecs = Object.keys(groupedRecs)[0];
+        if (firstItemWithRecs) {
+          setExpandedItems(new Set([firstItemWithRecs]));
+        }
       } catch (error) {
         console.error('Error loading recommendations:', error);
       } finally {
