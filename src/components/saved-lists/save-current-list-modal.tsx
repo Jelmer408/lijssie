@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { motion, AnimatePresence } from 'framer-motion'
 import { savedListsService } from '@/services/saved-lists-service'
@@ -20,7 +19,6 @@ interface SaveCurrentListModalProps {
 
 export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: SaveCurrentListModalProps) {
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -77,7 +75,7 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
       
       await savedListsService.createList({
         name: name.trim(),
-        description: description.trim(),
+        description: '',
         items: selectedItemsList.map(item => ({
           name: item.name,
           category: item.category,
@@ -95,7 +93,6 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
       });
 
       setName('');
-      setDescription('');
       onClose();
     } catch (error) {
       console.error('Error saving list:', error);
@@ -133,23 +130,10 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-              Beschrijving <span className="text-gray-400">(optioneel)</span>
-            </Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Voeg een beschrijving toe..."
-              className="w-full rounded-xl border-gray-200 bg-white/50 focus:border-blue-500 focus:ring-blue-500/20 min-h-[100px]"
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
               Items om op te slaan ({selectedItems.size}/{activeItems.length})
             </Label>
-            <ScrollArea className="h-[200px] w-full rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+            <ScrollArea className="h-[400px] w-full rounded-xl border border-gray-100 bg-gray-50/50 p-4">
               <AnimatePresence>
                 {activeItems.length > 0 ? (
                   <div className="space-y-2">
