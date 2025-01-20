@@ -1990,6 +1990,11 @@ export function GroceryListAppComponent() {
                           value={category}
                           dragListener={isReorderMode}
                           className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100"
+                          onPointerDown={(e: React.PointerEvent) => {
+                            if (!isReorderMode) {
+                              e.stopPropagation();
+                            }
+                          }}
                         >
                           <div className={cn(
                             "py-1.5 px-2.5 flex items-center gap-2 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl transition-colors duration-200",
@@ -2004,8 +2009,13 @@ export function GroceryListAppComponent() {
                               {categoryEmojis[category as Category] || categoryEmojis['Overig']} {category}
                             </h2>
                           </div>
-                          
-                          <div onPointerDown={(e) => e.stopPropagation()}>
+
+                          <div 
+                            className={cn(
+                              "relative",
+                              isReorderMode && "pointer-events-none"
+                            )}
+                          >
                             <ul className="space-y-3 p-4">
                               <AnimatePresence>
                                 {categoryItems.map((item) => (
