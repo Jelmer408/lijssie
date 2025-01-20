@@ -43,6 +43,26 @@ function StoryViewer({ story, onClose, currentPage, numPages, isLoading, pageWid
   // Get next Sunday's date
   const validUntilDate = getNextSunday();
 
+  // Add state for preloaded pages
+  const [preloadedPages, setPreloadedPages] = useState<number[]>([]);
+
+  // Preload adjacent pages
+  useEffect(() => {
+    const pagesToPreload = [
+      currentPage - 1,
+      currentPage,
+      currentPage + 1
+    ].filter(page => page >= 0 && page < (numPages || 0));
+
+    setPreloadedPages(pagesToPreload);
+  }, [currentPage, numPages]);
+
+  // Handle individual page load state
+  const handlePageLoadSuccess = (pageNumber: number) => {
+    // Just log for debugging purposes
+    console.debug(`Page ${pageNumber} loaded successfully`);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -108,16 +128,39 @@ function StoryViewer({ story, onClose, currentPage, numPages, isLoading, pageWid
             onLoadError={(error) => console.error('Error loading PDF:', error)}
             loading={null}
           >
-            <Page
-              pageNumber={currentPage + 1}
-              width={pageWidth}
-              height={pageHeight - 120}
-              scale={1.0}
-              renderMode="canvas"
-              loading={null}
-              renderTextLayer={false}
-              renderAnnotationLayer={false}
-            />
+            <div className="relative">
+              {preloadedPages.map((pageNum) => (
+                <motion.div
+                  key={pageNum}
+                  initial={{ opacity: pageNum === currentPage ? 0 : 0 }}
+                  animate={{ opacity: pageNum === currentPage ? 1 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{
+                    position: pageNum === currentPage ? 'relative' : 'absolute',
+                    top: 0,
+                    left: 0,
+                    pointerEvents: pageNum === currentPage ? 'auto' : 'none',
+                  }}
+                >
+                  <Page
+                    key={`page-${pageNum}`}
+                    pageNumber={pageNum + 1}
+                    width={pageWidth}
+                    height={pageHeight - 120}
+                    scale={1.0}
+                    renderMode="canvas"
+                    loading={null}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                    onRenderSuccess={() => handlePageLoadSuccess(pageNum)}
+                    onRenderError={() => handlePageLoadSuccess(pageNum)}
+                    onLoadSuccess={() => handlePageLoadSuccess(pageNum)}
+                    onLoadError={() => handlePageLoadSuccess(pageNum)}
+                    className="transition-opacity duration-200"
+                  />
+                </motion.div>
+              ))}
+            </div>
           </Document>
         </div>
 
