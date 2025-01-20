@@ -44,7 +44,8 @@ import { aiService } from '@/services/ai-service'
 import * as offlineStore from '@/lib/offline-store';
 import { SavedListsModal, SaveCurrentListModal } from '@/components/saved-lists';
 import { PreferencesModal } from '@/components/predictions';
-import { SaleRecommendations } from './sales/SaleRecommendations';
+import { SalesLayout } from './sales/SalesLayout';
+import { SupermarketStories } from '@/components/supermarket-stories/supermarket-stories';
 
 const defaultCategory: Category = 'Overig';
 
@@ -1418,7 +1419,7 @@ export function GroceryListAppComponent() {
     <>
         <div className="max-w-md mx-auto min-h-screen pb-24 bg-gradient-to-b from-gray-50 to-white text-gray-800 font-sans">
           <motion.header 
-            className="sticky top-0 z-40 px-4 sm:px-6 pt-2 mb-4" 
+            className="sticky top-0 z-40 px-4 sm:px-6 pt-1 mb-2"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
@@ -1426,46 +1427,46 @@ export function GroceryListAppComponent() {
             <div className="absolute inset-0 bg-white/30 backdrop-blur-xl -z-10" />
             
             {!isOnline && (
-              <div className="mb-2 px-3 py-1.5 bg-yellow-50 border border-yellow-100 rounded-lg text-sm text-yellow-700 flex items-center justify-center gap-2">
-                <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+              <div className="mb-1 px-3 py-1 bg-yellow-50 border border-yellow-100 rounded-lg text-xs text-yellow-700 flex items-center justify-center gap-2">
+                <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse" />
                 Offline modus - wijzigingen worden later gesynchroniseerd
               </div>
             )}
             
-            <div className="flex flex-col space-y-3 p-3 sm:p-4 rounded-3xl border border-gray-100/20 shadow-lg bg-gradient-to-r from-blue-500/5 to-blue-600/5"> 
-              <div className="flex items-center justify-between px-3 pt-8 pb-3"> 
+            <div className="flex flex-col space-y-2 p-2 sm:p-3 rounded-3xl border border-gray-100/20 shadow-lg bg-gradient-to-r from-blue-500/5 to-blue-600/5">
+              <div className="flex items-center justify-between px-3 pt-4 pb-2">
                 <div className="flex items-center gap-3">
                   <Dialog open={isHouseholdModalOpen} onOpenChange={setIsHouseholdModalOpen}>
                     <DialogTrigger asChild>
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className="w-12 h-12 rounded-xl flex items-center justify-center relative"
+                        className="w-10 h-10 rounded-xl flex items-center justify-center relative"
                       >
                         {user?.user_metadata?.avatar_url ? (
                           <>
                             <img
                               src={user.user_metadata.avatar_url}
                               alt={user.user_metadata?.full_name || 'User'}
-                              className="w-9 h-9 rounded-full object-cover"
+                              className="w-8 h-8 rounded-full object-cover"
                             />
-                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border-2 border-white" />
                           </>
                         ) : (
                           <div className="relative">
-                            <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
-                              <span className="text-sm font-medium text-blue-600">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                              <span className="text-xs font-medium text-blue-600">
                                 {user?.user_metadata?.full_name?.[0]?.toUpperCase() || '?'}
                               </span>
                             </div>
-                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border-2 border-white" />
                           </div>
                         )}
                       </motion.button>
                     </DialogTrigger>
                   </Dialog>
                   <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                    <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                       Boodschappen
                     </h1>
                   </div>
@@ -1479,8 +1480,8 @@ export function GroceryListAppComponent() {
                       className="relative group"
                     >
                       <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full blur opacity-30 group-hover:opacity-75 transition duration-300" />
-                      <div className="relative flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full shadow-lg transition-all duration-300">
-                        <Plus className="h-5 w-5 text-white" />
+                      <div className="relative flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full shadow-lg transition-all duration-300">
+                        <Plus className="h-4 w-4 text-white" />
                       </div>
                     </motion.button>
                   </DialogTrigger>
@@ -1588,22 +1589,29 @@ export function GroceryListAppComponent() {
 
               {activeView === 'list' && (
                 <motion.div 
-                  className="grid grid-cols-3 gap-2 sm:gap-4 mt-1 sm:mt-2" // Changed from mt-2 sm:mt-4
+                  className="grid grid-cols-3 gap-2 sm:gap-3"
                   initial={{ y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.3 }}
                 >
-                  <div className="flex flex-col items-center p-2 sm:p-3 rounded-2xl bg-white/50 backdrop-blur-sm border border-gray-100/20 shadow-sm">
-                    <span className="text-xs sm:text-sm text-gray-500">Te Kopen</span>
-                    <span className="text-xl sm:text-2xl font-semibold text-blue-600">{activeItems.length}</span>
+                  <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-2xl bg-white/50 backdrop-blur-sm border border-gray-100/20 shadow-sm">
+                    <span className="text-xs text-gray-500">Te Kopen</span>
+                    <span className="text-lg sm:text-xl font-semibold text-blue-600">{activeItems.length}</span>
                   </div>
-                  <div className="flex flex-col items-center p-2 sm:p-3 rounded-2xl bg-white/50 backdrop-blur-sm border border-gray-100/20 shadow-sm">
-                    <span className="text-xs sm:text-sm text-gray-500">Gekocht</span>
-                    <span className="text-xl sm:text-2xl font-semibold text-green-600">{purchasedItems.length}</span>
+                  <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-2xl bg-white/50 backdrop-blur-sm border border-gray-100/20 shadow-sm">
+                    <span className="text-xs text-gray-500">Gekocht</span>
+                    <span className="text-lg sm:text-xl font-semibold text-green-600">
+                      {purchasedItems.filter(item => {
+                        if (!item.created_at) return false;
+                        const itemDate = new Date(item.created_at);
+                        const today = new Date();
+                        return itemDate.toDateString() === today.toDateString();
+                      }).length}
+                    </span>
                   </div>
-                  <div className="flex flex-col items-center p-2 sm:p-3 rounded-2xl bg-white/50 backdrop-blur-sm border border-gray-100/20 shadow-sm">
-                    <span className="text-xs sm:text-sm text-gray-500">Prioriteit</span>
-                    <span className="text-xl sm:text-2xl font-semibold text-red-600">{priorityItems.length}</span>
+                  <div className="flex flex-col items-center p-1.5 sm:p-2 rounded-2xl bg-white/50 backdrop-blur-sm border border-gray-100/20 shadow-sm">
+                    <span className="text-xs text-gray-500">Prioriteit</span>
+                    <span className="text-lg sm:text-xl font-semibold text-red-600">{priorityItems.length}</span>
                   </div>
                 </motion.div>
               )}
@@ -1625,7 +1633,7 @@ export function GroceryListAppComponent() {
                 <div className="px-4">
                   {/* Time Selection and Content Container */}
                   <div className="relative">
-                    {storeStatuses.find(status => status.user_id === user?.id)?.status === 'walking' ? (
+                    {false && (storeStatuses.find(status => status.user_id === user?.id)?.status === 'walking' ? (
                       <motion.button
                         onClick={() => updateStoreStatus('in_store')}
                         className="relative w-full group overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-blue-500"
@@ -1701,7 +1709,7 @@ export function GroceryListAppComponent() {
                           <span className="text-white font-medium">Naar de supermarkt!</span>
                         </div>
                       </motion.button>
-                    )}
+                    ))}
 
                     {/* Time Selection Dialog remains unchanged */}
                     {showTimeDialog && (
@@ -1938,7 +1946,7 @@ export function GroceryListAppComponent() {
                       whileTap={{ scale: 0.98 }}
                     >
                       <List className="h-4 w-4" />
-                      <span>Opgeslagen lijsten</span>
+                      <span>Lijsten</span>
                     </motion.button>
 
                     {/* Reorder mode toggle button on the right */}
@@ -1954,7 +1962,7 @@ export function GroceryListAppComponent() {
                       whileTap={{ scale: 0.98 }}
                     >
                       <ArrowUpDown className="h-4 w-4" />
-                      <span>{isReorderMode ? 'Klaar met ordenen' : 'Volgorde aanpassen'}</span>
+                      <span>{isReorderMode ? 'Klaar met ordenen' : 'Volgorde'}</span>
                     </motion.button>
                   </div>
 
@@ -2027,57 +2035,52 @@ export function GroceryListAppComponent() {
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-                        ✅ Gekocht
+                        ✅ Vandaag gekocht
                       </h2>
-                      <motion.button
-                        onClick={() => {
-                          // Delete all purchased items
-                          purchasedItems.forEach(item => removeItem(item.id));
-                        }}
-                        className="text-sm px-3 py-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors duration-200 flex items-center gap-1.5"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        <span>Lijst wissen</span>
-                      </motion.button>
                     </div>
                     <ul className="space-y-3">
                       <AnimatePresence>
-                        {purchasedItems.map((item) => (
-                          <motion.li 
-                            key={item.id} 
-                            onClick={() => toggleItemCompletion(item.id, item.completed)}
-                            className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-b-0 group cursor-pointer hover:bg-gray-50/50 transition-colors duration-200"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <div className="flex items-center space-x-4 flex-1">
-                              <input
-                                type="checkbox"
-                                checked={item.completed}
-                                onChange={(e) => e.stopPropagation()}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleItemCompletion(item.id, item.completed);
-                                }}
-                                className="peer relative h-5 w-5 shrink-0 appearance-none rounded-full border-2 border-green-400 transition-colors duration-300 ease-in-out checked:border-green-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-200"
-                              />
-                              <div className="flex flex-col flex-1">
-                                <span className="text-gray-400 group-hover:text-gray-600 transition-all duration-300 ease-in-out flex items-center gap-2">
-                                  {item.emoji} {item.name}
-                                </span>
-                                {item.quantity && (
-                                  <span className="text-xs text-gray-300">
-                                    {item.quantity}
+                        {purchasedItems
+                          .filter(item => {
+                            if (!item.created_at) return false;
+                            const itemDate = new Date(item.created_at);
+                            const today = new Date();
+                            return itemDate.toDateString() === today.toDateString();
+                          })
+                          .map((item) => (
+                            <motion.li 
+                              key={item.id} 
+                              onClick={() => toggleItemCompletion(item.id, item.completed)}
+                              className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-b-0 group cursor-pointer hover:bg-gray-50/50 transition-colors duration-200"
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: 20 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              <div className="flex items-center space-x-4 flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={item.completed}
+                                  onChange={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleItemCompletion(item.id, item.completed);
+                                  }}
+                                  className="peer relative h-5 w-5 shrink-0 appearance-none rounded-full border-2 border-green-400 transition-colors duration-300 ease-in-out checked:border-green-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-200"
+                                />
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-gray-400 group-hover:text-gray-600 transition-all duration-300 ease-in-out flex items-center gap-2">
+                                    {item.emoji} {item.name}
                                   </span>
-                                )}
+                                  {item.quantity && (
+                                    <span className="text-xs text-gray-300">
+                                      {item.quantity}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </motion.li>
-                        ))}
+                            </motion.li>
+                          ))}
                       </AnimatePresence>
                     </ul>
                   </motion.div>
@@ -2342,13 +2345,14 @@ export function GroceryListAppComponent() {
               </motion.div>
             ) : (
               <motion.div 
-                className="flex-1 overflow-y-auto p-4 pb-24"
+                className="flex-1 overflow-y-auto"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
               >
-                <div className="mt-4">
-                  <SaleRecommendations groceryList={items.filter(item => !item.completed)} />
+                <div className="mt-6">
+                  <SupermarketStories />
+                  <SalesLayout groceryList={items.filter(item => !item.completed)} householdName={household?.name} />
                 </div>
               </motion.div>
             )}
@@ -2375,12 +2379,12 @@ export function GroceryListAppComponent() {
             </div>
 
             {/* Bottom navbar */}
-            <motion.div className="fixed bottom-4 left-4 right-4 bg-white/80 backdrop-blur-xl border border-gray-100/20 shadow-2xl rounded-full z-50">
+            <motion.div className="fixed bottom-3 left-4 right-4 bg-white/80 backdrop-blur-xl border border-gray-100/20 shadow-2xl rounded-full z-50">
               <div className="max-w-md mx-auto">
-                <div className="flex justify-around items-center px-4 py-2">
+                <div className="flex justify-around items-center px-4 py-1">
                   <motion.button
                     onClick={() => setActiveView('list')}
-                    className={`relative flex flex-col items-center gap-0.5 px-3 py-1 transition-all duration-300 ${
+                    className={`relative flex items-center justify-center p-1.5 transition-all duration-300 ${
                       activeView === 'list' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
                     }`}
                     whileHover={{ scale: 1.05 }}
@@ -2393,13 +2397,12 @@ export function GroceryListAppComponent() {
                         transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                       />
                     )}
-                    <span className="relative text-lg">📋</span>
-                    <span className="relative text-[9px] font-medium">Lijst</span>
+                    <span className="relative text-base">📋</span>
                   </motion.button>
 
                   <motion.button
                     onClick={() => setActiveView('trends')}
-                    className={`relative flex flex-col items-center gap-0.5 px-3 py-1 transition-all duration-300 ${
+                    className={`relative flex items-center justify-center p-1.5 transition-all duration-300 ${
                       activeView === 'trends' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
                     }`}
                     whileHover={{ scale: 1.05 }}
@@ -2412,13 +2415,12 @@ export function GroceryListAppComponent() {
                         transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                       />
                     )}
-                    <span className="relative text-lg">✨</span>
-                    <span className="relative text-[9px] font-medium">Activiteit</span>
+                    <span className="relative text-base">🏷️</span>
                   </motion.button>
 
                   <motion.button
                     onClick={() => setActiveView('meals')}
-                    className={`relative flex flex-col items-center gap-0.5 px-3 py-1 transition-all duration-300 ${
+                    className={`relative flex items-center justify-center p-1.5 transition-all duration-300 ${
                       activeView === 'meals' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
                     }`}
                     whileHover={{ scale: 1.05 }}
@@ -2431,18 +2433,16 @@ export function GroceryListAppComponent() {
                         transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                       />
                     )}
-                    <span className="relative text-lg">🍽️</span>
-                    <span className="relative text-[9px] font-medium">Maaltijden</span>
+                    <span className="relative text-base">🍽️</span>
                   </motion.button>
 
                   <motion.button
                     onClick={() => navigate('/koken')}
-                    className="relative flex flex-col items-center gap-0.5 px-3 py-1 transition-all duration-300 text-gray-400 hover:text-gray-600"
+                    className="relative flex items-center justify-center p-1.5 transition-all duration-300 text-gray-400 hover:text-gray-600"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <span className="relative text-lg">👨‍🍳</span>
-                    <span className="relative text-[9px] font-medium">Koken</span>
+                    <span className="relative text-base">👨‍🍳</span>
                   </motion.button>
                 </div>
               </div>

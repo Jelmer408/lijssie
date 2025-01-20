@@ -58,19 +58,20 @@ export const hybridSearchService = {
 
         const [{ embedding }] = embeddingResponse.data;
 
-        // Perform hybrid search using Supabase
+        // Perform hybrid search using Supabase with adjusted weights
         const { data: saleItems, error } = await supabase.rpc('hybrid_search', {
           query_text: item.name,
           query_embedding: embedding,
-          match_count: 20,
-          full_text_weight: 1.0,
-          semantic_weight: 1.0
+          match_count: 30,
+          full_text_weight: 0.7,
+          semantic_weight: 1.3
         });
 
         if (error) throw error;
 
-        // Transform and filter results
+        // Transform and filter results with a lower similarity threshold
         const recommendations = (saleItems as SaleItem[])
+          .filter(sale => sale.similarity > 0.3)
           .map(sale => ({
             saleItem: {
               id: sale.id,
