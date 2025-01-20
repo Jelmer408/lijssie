@@ -267,10 +267,8 @@ export function SaleRecommendations({ groceryList, householdName }: SaleRecommen
     <div className="w-full max-w-md mx-auto px-4">
       {/* Search Bar */}
       <div className="mb-6">
-        <div className="relative group">
-          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10">
-            <Search className="h-5 w-5 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-300" strokeWidth={2} />
-          </div>
+        <div className="relative flex items-center w-full group">
+          <Search className="h-5 w-5 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-300" strokeWidth={2} />
           <input
             type="text"
             value={searchQuery}
@@ -278,8 +276,8 @@ export function SaleRecommendations({ groceryList, householdName }: SaleRecommen
               setSearchQuery(e.target.value);
               handleSearch(e.target.value);
             }}
-            placeholder="Zoek in alle aanbiedingen..."
-            className="w-full pl-12 pr-12 py-3.5 bg-white/80 hover:bg-white/90 focus:bg-white backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-sm text-[15px] text-gray-900 placeholder-gray-500 outline-none ring-0 focus:ring-2 ring-offset-0 ring-blue-500/20 transition-all duration-300"
+            placeholder="Zoek in aanbiedingen..."
+            className="w-full pl-8 pr-4 py-2.5 bg-gray-100/80 backdrop-blur-sm rounded-xl border border-gray-200/50 focus:outline-none focus:border-gray-300/50 transition-colors duration-300 placeholder:text-gray-400 text-base"
           />
           {searchQuery && (
             <button
