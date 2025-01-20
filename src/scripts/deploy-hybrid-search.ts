@@ -27,7 +27,7 @@ async function deployHybridSearch() {
     const sql = fs.readFileSync(sqlPath, 'utf8');
 
     // Execute the SQL directly
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('_sql')
       .select('*')
       .eq('query', sql)
