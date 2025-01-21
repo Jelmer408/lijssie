@@ -108,7 +108,7 @@
 
         // Listen for messages from the service worker
         navigator.serviceWorker.addEventListener('message', (event) => {
-          if (event.data && event.data.type === 'CACHE_UPDATED') {
+          if (event.data && event.data.type === 'REFRESH_NEEDED') {
             // Show update notification or reload page
             window.location.reload();
           }
@@ -125,7 +125,7 @@
             
             // Add version parameter to service worker URL
             const swUrl = '/service-worker.js';
-            const swVersioned = `${swUrl}?v=1.0.0`; // Use fixed version instead of timestamp
+            const swVersioned = `${swUrl}?v=1.0.5`; // Update version to match service worker
             
             // Wait a moment before registering new service worker
             await new Promise(resolve => setTimeout(resolve, 1000));
