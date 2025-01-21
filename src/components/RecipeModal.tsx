@@ -51,10 +51,10 @@ const getInstructions = (recipe: Recipe | null): { step: number; text: string }[
   if (!recipe?.instructions) return [];
   
   if (Array.isArray(recipe.instructions)) {
-    return recipe.instructions.map((instruction: string, index: number) => {
+    return recipe.instructions.map((instruction: string | { step: number; text: string }, index: number) => {
       // If instruction is already in the correct format
       if (typeof instruction === 'object' && 'step' in instruction && 'text' in instruction) {
-        return instruction as { step: number; text: string };
+        return instruction;
       }
       // If instruction is a string, convert to the correct format
       return {
@@ -66,7 +66,7 @@ const getInstructions = (recipe: Recipe | null): { step: number; text: string }[
   
   // Handle string format with proper type assertion
   if (typeof recipe.instructions === 'string') {
-    const instructions = recipe.instructions as string;  // Type assertion here
+    const instructions = recipe.instructions as unknown as string;  // Type assertion here
     const steps = instructions.split('\n');
     return steps
       .filter((step: string) => step.trim())
