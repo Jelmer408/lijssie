@@ -66,8 +66,7 @@
     "devtools-protocol": "^0.0.1380148",
     "ws": "^8.16.0",
     "urlpattern-polyfill": "^10.0.0",
-    "node-fetch": "^3.3.2",
-    "vite-plugin-pwa": "^0.17.5"
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@shadcn/ui": "^0.0.4",

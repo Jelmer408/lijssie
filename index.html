@@ -116,12 +116,19 @@
 
         window.addEventListener('load', async () => {
           try {
+            // First, unregister any existing service workers
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map(registration => registration.unregister()));
+            
             // Check if we're in development mode
             const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             
             // Add cache-busting query parameter to service worker URL
-            const swUrl = isDev ? '/public/service-worker.js' : '/service-worker.js';
+            const swUrl = '/service-worker.js'; // Always use root path, Vite handles it correctly
             const swVersioned = `${swUrl}?v=${new Date().getTime()}`;
+            
+            // Wait a moment before registering new service worker
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
             // Register the service worker with cache busting
             const registration = await navigator.serviceWorker.register(swVersioned, {
@@ -130,7 +137,7 @@
             });
             
             // Check for updates immediately
-            registration.update();
+            await registration.update();
 
             // Set up periodic update checks
             setInterval(() => {

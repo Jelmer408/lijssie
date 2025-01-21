@@ -5,11 +5,11 @@ import App from './App';
 import './index.css';
 import { AuthProvider } from '@/contexts/auth-context';
 
-// Unregister any existing service workers
+// Unregister any existing service workers on startup
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for(let registration of registrations) {
-      registration.unregister();
+  navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+    for (const registration of registrations) {
+      await registration.unregister();
     }
   });
 }

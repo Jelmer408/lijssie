@@ -1996,11 +1996,11 @@ export function GroceryListAppComponent() {
                       
                       // Only update if the order actually changed
                       if (JSON.stringify(newOrder) !== JSON.stringify(orderedCategories)) {
-                        setOrderedCategories(newOrder);
-                        try {
-                          await categoryService.updateCategoryOrder(newOrder);
-                        } catch (error) {
-                          console.error('Error saving category order:', error);
+                      setOrderedCategories(newOrder);
+                      try {
+                        await categoryService.updateCategoryOrder(newOrder);
+                      } catch (error) {
+                        console.error('Error saving category order:', error);
                           // Revert on error
                           setOrderedCategories(orderedCategories);
                         }
@@ -2047,7 +2047,7 @@ export function GroceryListAppComponent() {
                               {categoryEmojis[category as Category] || categoryEmojis['Overig']} {category}
                             </h2>
                           </div>
-
+                          
                           <div 
                             className={cn(
                               "relative",
@@ -2103,39 +2103,39 @@ export function GroceryListAppComponent() {
                             return itemDate.toDateString() === today.toDateString();
                           })
                           .map((item) => (
-                            <motion.li 
-                              key={item.id} 
-                              onClick={() => toggleItemCompletion(item.id, item.completed)}
-                              className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-b-0 group cursor-pointer hover:bg-gray-50/50 transition-colors duration-200"
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: 20 }}
-                              transition={{ duration: 0.3 }}
-                            >
-                              <div className="flex items-center space-x-4 flex-1">
-                                <input
-                                  type="checkbox"
-                                  checked={item.completed}
-                                  onChange={(e) => e.stopPropagation()}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleItemCompletion(item.id, item.completed);
-                                  }}
-                                  className="peer relative h-5 w-5 shrink-0 appearance-none rounded-full border-2 border-green-400 transition-colors duration-300 ease-in-out checked:border-green-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-200"
-                                />
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-gray-400 group-hover:text-gray-600 transition-all duration-300 ease-in-out flex items-center gap-2">
-                                    {item.emoji} {item.name}
+                          <motion.li 
+                            key={item.id} 
+                            onClick={() => toggleItemCompletion(item.id, item.completed)}
+                            className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-b-0 group cursor-pointer hover:bg-gray-50/50 transition-colors duration-200"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <div className="flex items-center space-x-4 flex-1">
+                              <input
+                                type="checkbox"
+                                checked={item.completed}
+                                onChange={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleItemCompletion(item.id, item.completed);
+                                }}
+                                className="peer relative h-5 w-5 shrink-0 appearance-none rounded-full border-2 border-green-400 transition-colors duration-300 ease-in-out checked:border-green-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-200"
+                              />
+                              <div className="flex flex-col flex-1">
+                                <span className="text-gray-400 group-hover:text-gray-600 transition-all duration-300 ease-in-out flex items-center gap-2">
+                                  {item.emoji} {item.name}
+                                </span>
+                                {item.quantity && (
+                                  <span className="text-xs text-gray-300">
+                                    {item.quantity}
                                   </span>
-                                  {item.quantity && (
-                                    <span className="text-xs text-gray-300">
-                                      {item.quantity}
-                                    </span>
-                                  )}
-                                </div>
+                                )}
                               </div>
-                            </motion.li>
-                          ))}
+                            </div>
+                          </motion.li>
+                        ))}
                       </AnimatePresence>
                     </ul>
                   </motion.div>
@@ -2406,8 +2406,8 @@ export function GroceryListAppComponent() {
                 transition={{ duration: 0.5 }}
               >
                 <div className="mt-6">
-                  <SupermarketStories />
-                  <SalesLayout groceryList={items.filter(item => !item.completed)} householdName={household?.name} />
+                <SupermarketStories />
+                <SalesLayout groceryList={items.filter(item => !item.completed)} householdName={household?.name} />
                 </div>
               </motion.div>
             )}

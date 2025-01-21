@@ -12,6 +12,9 @@ export default defineConfig({
   server: {
     headers: {
       'Service-Worker-Allowed': '/'
+    },
+    watch: {
+      usePolling: true
     }
   },
   build: {
@@ -21,5 +24,9 @@ export default defineConfig({
         'service-worker': path.resolve(__dirname, 'public/service-worker.js')
       }
     }
+  },
+  publicDir: 'public',
+  worker: {
+    format: 'es'
   }
 }); 
