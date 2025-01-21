@@ -2,7 +2,22 @@ import puppeteer from 'puppeteer';
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 
+// Load environment variables from .env file in development
 config();
+
+// Validate environment variables
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_URL) {
+  console.error('Error: SUPABASE_URL environment variable is not set');
+  process.exit(1);
+}
+
+if (!SUPABASE_SERVICE_KEY) {
+  console.error('Error: SUPABASE_SERVICE_KEY environment variable is not set');
+  process.exit(1);
+}
 
 interface Product {
   id: string;
@@ -22,30 +37,21 @@ interface Product {
   created_at: string;
 }
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
+console.log('Initializing Supabase client...');
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 async function initializeDatabase() {
-  // Create products table if it doesn't exist
-  const { error: tableError } = await supabase.from('products').select().limit(1);
-  
-  if (tableError) {
-    await supabase.rpc('create_products_table', {
-      sql: `
-        CREATE TABLE IF NOT EXISTS products (
-          id TEXT PRIMARY KEY,
-          title TEXT NOT NULL,
-          quantity_info TEXT,
-          last_updated TEXT,
-          image_url TEXT,
-          category TEXT,
-          supermarket_data JSONB,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-        );
-      `
-    });
+  console.log('Checking database connection...');
+  try {
+    const { error: healthCheckError } = await supabase.from('products').select('count').limit(1);
+    if (healthCheckError) {
+      console.error('Database health check failed:', healthCheckError);
+      process.exit(1);
+    }
+    console.log('Database connection successful');
+  } catch (error) {
+    console.error('Error connecting to database:', error);
+    process.exit(1);
   }
 }
 
@@ -134,8 +140,10 @@ async function scrapeProducts() {
 
 async function main() {
   try {
+    console.log('Starting product scraper...');
     await initializeDatabase();
     await scrapeProducts();
+    console.log('Product scraping completed successfully');
   } catch (error) {
     console.error('Error in main:', error);
     process.exit(1);

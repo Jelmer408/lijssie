@@ -14,21 +14,41 @@ jobs:
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm ci
+          echo "Node.js version: $(node -v)"
+          echo "NPM version: $(npm -v)"
 
       - name: Install Puppeteer dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y chromium-browser
 
+      - name: Validate environment variables
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "Error: SUPABASE_URL is not set"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "Error: SUPABASE_SERVICE_KEY is not set"
+            exit 1
+          fi
+          echo "Environment variables validated successfully"
+
       - name: Run scraper
-        run: npx tsx src/scripts/scrape-products.ts 
+        run: |
+          echo "Starting product scraper..."
+          npx tsx src/scripts/scrape-products.ts
+        env:
+          NODE_ENV: production 
