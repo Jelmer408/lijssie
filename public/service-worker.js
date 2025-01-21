@@ -1,4 +1,4 @@
-const CACHE_VERSION = '1.0.0';
+const CACHE_VERSION = '1.0.1';
 const CACHE_NAME = `lijssie-v${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/',
@@ -12,6 +12,13 @@ const STATIC_ASSETS = [
   '/supermarkets/aldi-logo.png',
   '/supermarkets/lidl-logo.png',
   '/supermarkets/plus-logo.png'
+];
+
+// Add specific routes that should check for updates more frequently
+const DYNAMIC_ROUTES = [
+  '/koken',
+  '/api/recipes',
+  '/api/cooking'
 ];
 
 // Check if URL is supported for caching
@@ -78,83 +85,44 @@ self.addEventListener('message', (event) => {
 
 // Fetch event - network first, then cache, fallback to offline handling
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
-  if (event.request.method !== 'GET') {
-    return;
-  }
+  const url = new URL(event.request.url);
+  
+  // Check if this is a dynamic route that needs frequent updates
+  const isDynamicRoute = DYNAMIC_ROUTES.some(route => url.pathname.includes(route));
 
-  // Only handle HTTP/HTTPS requests
-  if (!isValidUrl(event.request.url)) {
-    return;
-  }
-
-  // Skip caching for excluded URLs
-  if (shouldExcludeFromCache(event.request.url)) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
-  // Handle navigation requests
-  if (event.request.mode === 'navigate') {
+  if (isDynamicRoute) {
+    // Network first, fallback to cache for dynamic routes
     event.respondWith(
       fetch(event.request)
+        .then(response => {
+          // Clone the response before caching it
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+          return response;
+        })
         .catch(() => {
-          return caches.match('/index.html');
+          return caches.match(event.request);
         })
     );
-    return;
-  }
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cache successful responses
-        if (response && response.status === 200 && 
-            response.type === 'basic' && 
-            isValidUrl(event.request.url)) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => {
+  } else {
+    // Cache first, network fallback for other routes
+    event.respondWith(
+      caches.match(event.request)
+        .then(response => {
+          if (response) {
+            return response;
+          }
+          return fetch(event.request).then(response => {
+            // Clone the response before caching it
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
               cache.put(event.request, responseToCache);
-            })
-            .catch((err) => console.error('Cache put error:', err));
-        }
-        return response;
-      })
-      .catch(async () => {
-        // Try to get from cache
-        const cachedResponse = await caches.match(event.request);
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        // If it's an API request that failed and isn't in the cache,
-        // return a JSON response indicating offline status
-        if (event.request.url.includes('/rest/v1/')) {
-          return new Response(
-            JSON.stringify({
-              error: 'offline',
-              message: 'You are currently offline. Changes will be synced when you reconnect.',
-            }),
-            {
-              status: 503,
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            }
-          );
-        }
-
-        // For HTML requests, return the offline page
-        if (event.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('/index.html');
-        }
-
-        // For other requests, return a network error
-        return new Response('Network error happened', {
-          status: 503,
-          headers: { 'Content-Type': 'text/plain' },
-        });
-      })
-  );
+            });
+            return response;
+          });
+        })
+    );
+  }
 }); 

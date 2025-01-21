@@ -50,33 +50,10 @@ const normalizeUnit = (unit: string): string => {
 const getInstructions = (recipe: Recipe | null): { step: number; text: string }[] => {
   if (!recipe?.instructions) return [];
   
-  if (Array.isArray(recipe.instructions)) {
-    return recipe.instructions.map((instruction: string | { step: number; text: string }, index: number) => {
-      // If instruction is already in the correct format
-      if (typeof instruction === 'object' && 'step' in instruction && 'text' in instruction) {
-        return instruction;
-      }
-      // If instruction is a string, convert to the correct format
-      return {
-        step: index + 1,
-        text: instruction as string
-      };
-    });
-  }
-  
-  // Handle string format with proper type assertion
-  if (typeof recipe.instructions === 'string') {
-    const instructions = recipe.instructions as unknown as string;  // Type assertion here
-    const steps = instructions.split('\n');
-    return steps
-      .filter((step: string) => step.trim())
-      .map((step: string, index: number) => ({
-        step: index + 1,
-        text: step.trim()
-      }));
-  }
-  
-  return [];
+  return recipe.instructions.map((instruction: string, index: number) => ({
+    step: index + 1,
+    text: instruction
+  }));
 };
 
 // Fix getIngredients return type
@@ -697,12 +674,12 @@ export function RecipeModal({
                       y: 0,
                       transition: { delay: index * 0.05 }
                     }}
-                    className="flex gap-4 p-4 bg-gray-50 rounded-xl"
+                    className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl"
                   >
                     <div className="w-6 h-6 bg-blue-500 rounded-lg flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
                       {instruction.step}
                     </div>
-                    <p className="text-gray-700 text-sm leading-relaxed">{instruction.text}</p>
+                    <p className="text-gray-700 text-sm leading-relaxed flex-1">{instruction.text}</p>
                   </motion.div>
                 ))}
               </motion.div>

@@ -166,6 +166,32 @@ export function KokenPage() {
   const [generationsLeft, setGenerationsLeft] = useState<number | null>(null);
   const navigate = useNavigate();
 
+  // Add effect to check for updates
+  useEffect(() => {
+    // Function to check for updates
+    const checkForUpdates = async () => {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        try {
+          // Trigger a check for updates
+          const registration = await navigator.serviceWorker.ready;
+          await registration.update();
+        } catch (error) {
+          console.error('Error checking for updates:', error);
+        }
+      }
+    };
+
+    // Check for updates when the component mounts
+    checkForUpdates();
+
+    // Set up periodic update checks
+    const updateInterval = setInterval(checkForUpdates, 5 * 60 * 1000); // Check every 5 minutes
+
+    return () => {
+      clearInterval(updateInterval);
+    };
+  }, []);
+
   useEffect(() => {
     const setupFavorites = async () => {
       const { data: { user } } = await supabase.auth.getUser();
