@@ -92,6 +92,59 @@
     </style>
   </head>
   <body>
+    <!-- Splash Screen -->
+    <div id="splash" style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: linear-gradient(125deg, #F8FAFF 0%, #FFFFFF 100%);">
+      <!-- Ambient background effects -->
+      <div style="position: absolute; inset: 0; overflow: hidden;">
+        <!-- Gradient orbs -->
+        <div style="position: absolute; top: 10%; left: 15%; width: 250px; height: 250px; background: radial-gradient(circle at center, rgba(36, 98, 233, 0.08), rgba(36, 98, 233, 0.01)); border-radius: 50%; filter: blur(50px);"></div>
+        <div style="position: absolute; bottom: 20%; right: 15%; width: 200px; height: 200px; background: radial-gradient(circle at center, rgba(30, 65, 175, 0.08), rgba(30, 65, 175, 0.01)); border-radius: 50%; filter: blur(45px);"></div>
+      </div>
+
+      <!-- Main content container with glass effect -->
+      <div style="position: relative; padding: 3rem; background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.8)); border-radius: 40px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05); border: 1px solid rgba(255, 255, 255, 0.4);">
+        <!-- Inner glow effect -->
+        <div style="position: absolute; inset: 0; background: linear-gradient(145deg, rgba(36, 98, 233, 0.08), rgba(30, 65, 175, 0.08)); border-radius: 40px; filter: blur(40px); opacity: 0.5;"></div>
+        
+        <!-- Content wrapper -->
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; gap: 2rem;">
+          <!-- Logo container -->
+          <div style="position: relative; width: 160px; height: 160px;">
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+              <img src="/logo.png" alt="Lijssie Logo" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1)); border-radius: 40px;" />
+            </div>
+          </div>
+
+          <!-- Title with modern gradient -->
+          <div>
+            <h1 style="font-size: 32px; font-weight: 800; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; background: linear-gradient(145deg, #2462E9, #1E41AF); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.03em;">
+              Lijssie
+            </h1>
+          </div>
+
+          <!-- Modern loading indicator -->
+          <div style="display: flex; align-items: center; gap: 3px;">
+            <div style="width: 4px; height: 20px; border-radius: 2px; background: #2462E9; animation: modernBars 1.2s ease-in-out infinite; transform-origin: center;"></div>
+            <div style="width: 4px; height: 20px; border-radius: 2px; background: #2462E9; animation: modernBars 1.2s ease-in-out infinite 0.2s; transform-origin: center;"></div>
+            <div style="width: 4px; height: 20px; border-radius: 2px; background: #1E41AF; animation: modernBars 1.2s ease-in-out infinite 0.4s; transform-origin: center;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Enhanced animation keyframes -->
+    <style>
+      @keyframes modernBars {
+        0%, 100% { 
+          height: 20px;
+          opacity: 0.4;
+        }
+        50% { 
+          height: 40px;
+          opacity: 1;
+        }
+      }
+    </style>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>

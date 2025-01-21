@@ -85,4 +85,27 @@ export async function deleteLocalItem(id: string) {
 // Add local item
 export async function addLocalItem(item: GroceryItem) {
   await db.add('groceryItems', item);
+}
+
+// Clear specific changes
+export async function clearSpecificChanges(changes: Array<{ type: string; item: GroceryItem; timestamp: number }>) {
+  const tx = db.transaction('offlineChanges', 'readwrite');
+  const store = tx.store;
+
+  // Get all changes
+  const allChanges = await store.getAll();
+
+  // Filter out the changes we want to remove
+  const changesToKeep = allChanges.filter(existingChange => 
+    !changes.some(changeToRemove => 
+      changeToRemove.type === existingChange.type && 
+      changeToRemove.item.id === existingChange.item.id && 
+      changeToRemove.timestamp === existingChange.timestamp
+    )
+  );
+
+  // Clear the store and add back the changes we want to keep
+  await store.clear();
+  await Promise.all(changesToKeep.map(change => store.add(change)));
+  await tx.done;
 } 

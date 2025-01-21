@@ -343,6 +343,15 @@ export function GroceryListAppComponent() {
         navigate('/join-household');
       } finally {
         setIsCheckingMembership(false);
+        // Remove splash screen after membership check is complete
+        const initialSplash = document.getElementById('splash');
+        if (initialSplash) {
+          initialSplash.style.opacity = '0';
+          initialSplash.style.transition = 'opacity 0.5s ease';
+          setTimeout(() => {
+            initialSplash.remove();
+          }, 500);
+        }
       }
     };
 
@@ -1280,6 +1289,9 @@ export function GroceryListAppComponent() {
         const pendingChanges = await offlineStore.getPendingChanges();
         if (pendingChanges.length === 0) return;
 
+        const successfulChanges = [];
+        const failedChanges = [];
+
         for (const change of pendingChanges) {
           try {
             switch (change.type) {
@@ -1289,25 +1301,48 @@ export function GroceryListAppComponent() {
                   .insert([change.item])
                   .select()
                   .single();
+                successfulChanges.push(change);
                 break;
               case 'update':
                 await supabase
                   .from('grocery_items')
                   .update(change.item)
                   .eq('id', change.item.id);
+                successfulChanges.push(change);
                 break;
               case 'delete':
                 await supabase
                   .from('grocery_items')
                   .delete()
                   .eq('id', change.item.id);
+                successfulChanges.push(change);
                 break;
             }
-            // Clear all processed changes
-            await offlineStore.clearProcessedChanges();
           } catch (error) {
             console.error('Error processing offline change:', error);
+            failedChanges.push(change);
           }
+        }
+
+        // Only clear the successful changes
+        if (successfulChanges.length > 0) {
+          await offlineStore.clearSpecificChanges(successfulChanges);
+        }
+
+        // Notify user about the sync results
+        if (successfulChanges.length > 0) {
+          toast({
+            title: "Synchronisatie voltooid ✨",
+            description: `${successfulChanges.length} wijziging${successfulChanges.length === 1 ? '' : 'en'} gesynchroniseerd.`,
+          });
+        }
+
+        if (failedChanges.length > 0) {
+          toast({
+            title: "Synchronisatie waarschuwing",
+            description: `${failedChanges.length} wijziging${failedChanges.length === 1 ? '' : 'en'} kon${failedChanges.length === 1 ? '' : 'den'} niet worden gesynchroniseerd en zal${failedChanges.length === 1 ? '' : 'len'} opnieuw worden geprobeerd.`,
+            variant: "destructive",
+          });
         }
 
         // Refresh the items list after syncing
@@ -1315,6 +1350,11 @@ export function GroceryListAppComponent() {
         setItems(items);
       } catch (error) {
         console.error('Error syncing offline changes:', error);
+        toast({
+          title: "Synchronisatie fout",
+          description: "Er ging iets mis bij het synchroniseren. De wijzigingen blijven bewaard en worden later opnieuw geprobeerd.",
+          variant: "destructive",
+        });
       }
     }
 
@@ -1324,7 +1364,6 @@ export function GroceryListAppComponent() {
       toast({
         title: "Online",
         description: "Je bent weer online. Wijzigingen worden gesynchroniseerd.",
-        variant: "default"
       });
     }
 
@@ -1333,7 +1372,6 @@ export function GroceryListAppComponent() {
       toast({
         title: "Offline",
         description: "Je bent offline. Wijzigingen worden opgeslagen en later gesynchroniseerd.",
-        variant: "default"
       });
     }
 
@@ -1341,27 +1379,17 @@ export function GroceryListAppComponent() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Initial sync if we're online
-    if (navigator.onLine) {
-      syncOfflineChanges();
-    }
-
+    // Clean up event listeners
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [household?.id]);
+  }, [household?.id, toast]);
 
   // 7. Loading state check - AFTER all hooks are declared
   if (isCheckingMembership) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="space-y-4 text-center">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-gray-500">Laden...</p>
-        </div>
-      </div>
-    );
+    // Keep the splash screen visible while checking membership
+    return null;
   }
 
   // Update the handleToggleFavorite function

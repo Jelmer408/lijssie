@@ -30,15 +30,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (mounted) {
           setUser(session?.user ?? null);
           setError(null);
+          setLoading(false);
         }
       } catch (err) {
         console.error('Error initializing auth:', err);
         if (mounted) {
           setError(err instanceof Error ? err : new Error('Failed to initialize auth'));
           setUser(null);
-        }
-      } finally {
-        if (mounted) {
           setLoading(false);
         }
       }
