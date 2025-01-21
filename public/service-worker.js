@@ -1,5 +1,6 @@
-const CACHE_VERSION = '1.0.1';
+const CACHE_VERSION = '1.0.2';
 const CACHE_NAME = `lijssie-v${CACHE_VERSION}`;
+
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -83,45 +84,51 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Fetch event - network first, then cache, fallback to offline handling
+// Fetch event handler
 self.addEventListener('fetch', (event) => {
+  // Handle non-GET requests directly without caching
+  if (event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   const url = new URL(event.request.url);
-  
-  // Check if this is a dynamic route that needs frequent updates
   const isDynamicRoute = DYNAMIC_ROUTES.some(route => url.pathname.includes(route));
 
   if (isDynamicRoute) {
-    // Network first, fallback to cache for dynamic routes
+    // Network-first strategy for dynamic routes
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request.clone())
         .then(response => {
-          // Clone the response before caching it
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
+          if (response.ok) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME)
+              .then(cache => cache.put(event.request, responseToCache))
+              .catch(error => console.error('Cache put error:', error));
+          }
           return response;
         })
-        .catch(() => {
-          return caches.match(event.request);
-        })
+        .catch(() => caches.match(event.request))
     );
   } else {
-    // Cache first, network fallback for other routes
+    // Cache-first strategy for other routes
     event.respondWith(
       caches.match(event.request)
-        .then(response => {
-          if (response) {
-            return response;
+        .then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
           }
-          return fetch(event.request).then(response => {
-            // Clone the response before caching it
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache);
+
+          return fetch(event.request.clone())
+            .then(response => {
+              if (response.ok) {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME)
+                  .then(cache => cache.put(event.request, responseToCache))
+                  .catch(error => console.error('Cache put error:', error));
+              }
+              return response;
             });
-            return response;
-          });
         })
     );
   }
