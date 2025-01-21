@@ -1,4 +1,4 @@
-const CACHE_VERSION = '1.0.2';
+const CACHE_VERSION = '1.0.3';
 const CACHE_NAME = `lijssie-v${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
@@ -26,7 +26,8 @@ const DYNAMIC_ROUTES = [
 function isValidUrl(url) {
   try {
     const parsedUrl = new URL(url);
-    return ['http:', 'https:'].includes(parsedUrl.protocol);
+    return ['http:', 'https:'].includes(parsedUrl.protocol) && 
+           !parsedUrl.href.startsWith('chrome-extension://');
   } catch (e) {
     return false;
   }
@@ -34,12 +35,33 @@ function isValidUrl(url) {
 
 // Check if URL should be excluded from caching
 function shouldExcludeFromCache(url) {
+  if (!isValidUrl(url)) return true;
+  
   try {
     const parsedUrl = new URL(url);
-    // Only exclude realtime endpoints, allow caching of auth and rest endpoints for offline support
     return parsedUrl.pathname.includes('/realtime/');
   } catch (e) {
-    return false;
+    return true;
+  }
+}
+
+// Helper function to safely cache a response
+async function safeCachePut(request, response) {
+  if (!isValidUrl(request.url)) {
+    console.log('Skipping cache for invalid URL:', request.url);
+    return;
+  }
+
+  if (shouldExcludeFromCache(request.url)) {
+    console.log('Skipping cache for excluded URL:', request.url);
+    return;
+  }
+
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response);
+  } catch (error) {
+    console.error('Cache put error:', error);
   }
 }
 
@@ -86,8 +108,8 @@ self.addEventListener('message', (event) => {
 
 // Fetch event handler
 self.addEventListener('fetch', (event) => {
-  // Handle non-GET requests directly without caching
-  if (event.request.method !== 'GET') {
+  // Skip non-GET requests and chrome-extension URLs
+  if (event.request.method !== 'GET' || event.request.url.startsWith('chrome-extension://')) {
     event.respondWith(fetch(event.request));
     return;
   }
@@ -100,7 +122,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request.clone())
         .then(response => {
-          if (response.ok) {
+          if (response.ok && !event.request.url.startsWith('chrome-extension://')) {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME)
               .then(cache => cache.put(event.request, responseToCache))
@@ -121,7 +143,7 @@ self.addEventListener('fetch', (event) => {
 
           return fetch(event.request.clone())
             .then(response => {
-              if (response.ok) {
+              if (response.ok && !event.request.url.startsWith('chrome-extension://')) {
                 const responseToCache = response.clone();
                 caches.open(CACHE_NAME)
                   .then(cache => cache.put(event.request, responseToCache))
