@@ -106,24 +106,45 @@
           }
         });
 
+        // Listen for messages from the service worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data && event.data.type === 'CACHE_UPDATED') {
+            // Show update notification or reload page
+            window.location.reload();
+          }
+        });
+
         window.addEventListener('load', async () => {
           try {
-            // Register the service worker
-            const registration = await navigator.serviceWorker.register('/service-worker.js', {
-              scope: '/'
+            // Add cache-busting query parameter to service worker URL
+            const swUrl = '/service-worker.js?v=' + new Date().getTime();
+            
+            // Register the service worker with cache busting
+            const registration = await navigator.serviceWorker.register(swUrl, {
+              scope: '/',
+              updateViaCache: 'none' // Bypass the HTTP cache for service worker
             });
-            console.log('ServiceWorker registration successful with scope:', registration.scope);
+            
+            // Check for updates immediately
+            registration.update();
+
+            // Set up periodic update checks
+            setInterval(() => {
+              registration.update();
+            }, 60 * 60 * 1000); // Check for updates every hour
 
             // Handle updates
             registration.addEventListener('updatefound', () => {
               const newWorker = registration.installing;
               newWorker.addEventListener('statechange', () => {
-                // Only reload if there's new content
-                if (newWorker.state === 'activated' && !navigator.serviceWorker.controller) {
-                  window.location.reload();
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // New content is available, trigger update
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
                 }
               });
             });
+
+            console.log('ServiceWorker registration successful with scope:', registration.scope);
           } catch (error) {
             console.error('ServiceWorker registration failed:', error);
           }

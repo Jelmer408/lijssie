@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lijssie-v1.0.0';
+const CACHE_NAME = 'lijssie-v1.0.0-' + new Date().toISOString();
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -47,18 +47,32 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
+      // Clear old caches
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
             if (cacheName !== CACHE_NAME) {
+              console.log('Deleting old cache:', cacheName);
               return caches.delete(cacheName);
             }
           })
         );
       }),
-      self.clients.claim()
+      // Force update of all clients
+      self.clients.claim(),
+      // Optionally force reload all clients
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'CACHE_UPDATED' }));
+      })
     ])
   );
+});
+
+// Add message handler for client updates
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Fetch event - network first, then cache, fallback to offline handling
