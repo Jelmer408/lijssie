@@ -1,4 +1,4 @@
-const CACHE_VERSION = '1.0.5';
+const CACHE_VERSION = '1.0.4';
 const CACHE_NAME = `lijssie-v${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
@@ -67,20 +67,16 @@ async function safeCachePut(request, response) {
   }
 }
 
-// Install event - cache static assets and force update
+// Install event - cache static assets
 self.addEventListener('install', (event) => {
-  // Force waiting service worker to become active
-  self.skipWaiting();
-  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(STATIC_ASSETS))
   );
 });
 
-// Activate event - clean up old caches and take control
+// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  // Take control of all clients immediately
   event.waitUntil(
     Promise.all([
       // Clear old caches
@@ -93,12 +89,6 @@ self.addEventListener('activate', (event) => {
             }
           })
         );
-      }),
-      // Take control of all clients
-      self.clients.claim(),
-      // Notify all clients to refresh
-      self.clients.matchAll().then(clients => {
-        clients.forEach(client => client.postMessage({ type: 'REFRESH_NEEDED' }));
       })
     ])
   );
@@ -108,10 +98,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
-    // Notify clients to refresh after skipping waiting
-    self.clients.matchAll().then(clients => {
-      clients.forEach(client => client.postMessage({ type: 'REFRESH_NEEDED' }));
-    });
   }
 });
 
