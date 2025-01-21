@@ -1,4 +1,4 @@
-const CACHE_VERSION = '1.0.3';
+const CACHE_VERSION = '1.0.4';
 const CACHE_NAME = `lijssie-v${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
@@ -39,7 +39,9 @@ function shouldExcludeFromCache(url) {
   
   try {
     const parsedUrl = new URL(url);
-    return parsedUrl.pathname.includes('/realtime/');
+    // Exclude realtime endpoints and service worker
+    return parsedUrl.pathname.includes('/realtime/') ||
+           parsedUrl.pathname.endsWith('service-worker.js');
   } catch (e) {
     return true;
   }
@@ -70,7 +72,6 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -88,9 +89,7 @@ self.addEventListener('activate', (event) => {
             }
           })
         );
-      }),
-      // Take control of all clients
-      self.clients.claim()
+      })
     ])
   );
 });
@@ -99,10 +98,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
-    // Only notify clients about updates when explicitly requested
-    self.clients.matchAll().then(clients => {
-      clients.forEach(client => client.postMessage({ type: 'CACHE_UPDATED' }));
-    });
   }
 });
 
@@ -110,6 +105,12 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests and chrome-extension URLs
   if (event.request.method !== 'GET' || event.request.url.startsWith('chrome-extension://')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // Skip service worker requests to prevent infinite loops
+  if (event.request.url.includes('service-worker.js')) {
     event.respondWith(fetch(event.request));
     return;
   }
@@ -124,9 +125,7 @@ self.addEventListener('fetch', (event) => {
         .then(response => {
           if (response.ok && !event.request.url.startsWith('chrome-extension://')) {
             const responseToCache = response.clone();
-            caches.open(CACHE_NAME)
-              .then(cache => cache.put(event.request, responseToCache))
-              .catch(error => console.error('Cache put error:', error));
+            safeCachePut(event.request, responseToCache);
           }
           return response;
         })
@@ -138,16 +137,16 @@ self.addEventListener('fetch', (event) => {
       caches.match(event.request)
         .then(cachedResponse => {
           if (cachedResponse) {
+            // Return cached response immediately
             return cachedResponse;
           }
 
+          // If not in cache, fetch from network
           return fetch(event.request.clone())
             .then(response => {
               if (response.ok && !event.request.url.startsWith('chrome-extension://')) {
                 const responseToCache = response.clone();
-                caches.open(CACHE_NAME)
-                  .then(cache => cache.put(event.request, responseToCache))
-                  .catch(error => console.error('Cache put error:', error));
+                safeCachePut(event.request, responseToCache);
               }
               return response;
             });
