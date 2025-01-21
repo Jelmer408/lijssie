@@ -123,34 +123,32 @@
             // Check if we're in development mode
             const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
             
-            // Add cache-busting query parameter to service worker URL
-            const swUrl = '/service-worker.js'; // Always use root path, Vite handles it correctly
-            const swVersioned = `${swUrl}?v=${new Date().getTime()}`;
+            // Add version parameter to service worker URL
+            const swUrl = '/service-worker.js';
+            const swVersioned = `${swUrl}?v=1.0.0`; // Use fixed version instead of timestamp
             
             // Wait a moment before registering new service worker
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Register the service worker with cache busting
+            // Register the service worker
             const registration = await navigator.serviceWorker.register(swVersioned, {
               scope: '/',
-              updateViaCache: 'none' // Bypass the HTTP cache for service worker
+              updateViaCache: 'none'
             });
             
-            // Check for updates immediately
-            await registration.update();
-
-            // Set up periodic update checks
+            // Check for updates less frequently
             setInterval(() => {
               registration.update();
-            }, 60 * 60 * 1000); // Check for updates every hour
+            }, 24 * 60 * 60 * 1000); // Check for updates once per day
 
             // Handle updates
             registration.addEventListener('updatefound', () => {
               const newWorker = registration.installing;
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // New content is available, trigger update
-                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  // New content is available, but don't force update
+                  console.log('New service worker available');
+                  // Let the service worker decide when to take over
                 }
               });
             });

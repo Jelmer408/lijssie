@@ -1,4 +1,5 @@
-const CACHE_NAME = 'lijssie-v1.0.0-' + new Date().toISOString();
+const CACHE_VERSION = '1.0.0';
+const CACHE_NAME = `lijssie-v${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -58,12 +59,8 @@ self.addEventListener('activate', (event) => {
           })
         );
       }),
-      // Force update of all clients
-      self.clients.claim(),
-      // Optionally force reload all clients
-      self.clients.matchAll().then(clients => {
-        clients.forEach(client => client.postMessage({ type: 'CACHE_UPDATED' }));
-      })
+      // Take control of all clients
+      self.clients.claim()
     ])
   );
 });
@@ -72,6 +69,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+    // Only notify clients about updates when explicitly requested
+    self.clients.matchAll().then(clients => {
+      clients.forEach(client => client.postMessage({ type: 'CACHE_UPDATED' }));
+    });
   }
 });
 
