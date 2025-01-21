@@ -322,7 +322,7 @@ export function RecipeModal({
         await groceryService.addItem(item, householdId);
         setAddedIngredients((prev) => [...prev, getIngredientId(ingredient)]);
       }
-      
+
       toast({
         title: "Alle ingrediënten toegevoegd",
         description: "Alle ingrediënten zijn toegevoegd aan je boodschappenlijst.",

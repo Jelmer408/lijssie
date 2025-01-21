@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import { Browser } from 'puppeteer';
+import type { Browser } from 'puppeteer';
+import puppeteer from 'puppeteer';
 import puppeteer_extra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
@@ -17,6 +18,24 @@ interface SupermarketOffer {
   valid_from: Date;
   valid_until: Date;
   image_url?: string;
+}
+
+interface Product {
+  id: string;
+  title: string;
+  quantity_info: string;
+  last_updated: string;
+  image_url: string;
+  category: string;
+  supermarket_data: {
+    supermarket: string;
+    logo_url: string;
+    price: string;
+    price_per_unit: string;
+    sale_valid_from?: string;
+    sale_percentage?: string;
+  }[];
+  created_at: string;
 }
 
 class SupermarketScraperService {
@@ -324,6 +343,102 @@ class SupermarketScraperService {
         }, 100);
       });
     });
+  }
+
+  async scrapeAllProducts() {
+    console.log('Checking database connection...');
+    try {
+      const { error: healthCheckError } = await supabase.from('products').select('count').limit(1);
+      if (healthCheckError) {
+        console.error('Database health check failed:', healthCheckError);
+        throw healthCheckError;
+      }
+      console.log('Database connection successful');
+    } catch (error) {
+      console.error('Error connecting to database:', error);
+      throw error;
+    }
+
+    const browser = await puppeteer.launch({ 
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1920, height: 1080 });
+
+      // Navigate to the main page
+      await page.goto('https://schapr.nl/boodschappen', { waitUntil: 'networkidle0' });
+
+      // Get all category links
+      const categoryLinks = await page.$$eval(
+        'div.-mt-1.grid.w-full.grid-cols-1.gap-2\\.5.md\\:mt-0.md\\:grid-cols-3.lg\\:grid-cols-5.lg\\:gap-2.xl\\:grid-cols-6\\.2xl\\:grid-cols-7 > a',
+        (links: HTMLAnchorElement[]) => links.map(link => ({
+          href: link.href,
+          category: link.textContent?.trim() || ''
+        }))
+      );
+
+      for (const { href: categoryUrl, category } of categoryLinks) {
+        console.log(`Scraping category: ${category}`);
+        await page.goto(categoryUrl, { waitUntil: 'networkidle0' });
+
+        // Get all product links in this category
+        const productLinks = await page.$$eval(
+          'div.ais-Hits article > a',
+          (links: HTMLAnchorElement[]) => links.map(link => link.href)
+        );
+
+        for (const productUrl of productLinks) {
+          try {
+            await page.goto(productUrl, { waitUntil: 'networkidle0' });
+
+            // Extract product details
+            const product: Product = {
+              id: productUrl.split('/').pop() || '',
+              title: await page.$eval('#product-detail h1', (el: HTMLElement) => el.textContent?.trim() || ''),
+              quantity_info: await page.$eval('#product-detail > div:nth-child(1) > span', (el: HTMLElement) => el.textContent?.trim() || ''),
+              last_updated: await page.$eval('#product-detail > div:nth-child(1) > p', (el: HTMLElement) => el.textContent?.trim() || ''),
+              image_url: await page.$eval('img.h-full.w-full.object-contain', (el: HTMLImageElement) => el.getAttribute('src') || ''),
+              category,
+              supermarket_data: [],
+              created_at: new Date().toISOString()
+            };
+
+            // Extract supermarket data
+            const supermarketElements = await page.$$('div.relative.order-3 > div > div');
+            for (const element of supermarketElements) {
+              const supermarketData = {
+                supermarket: await element.$eval('img', (el: HTMLImageElement) => el.getAttribute('alt') || ''),
+                logo_url: await element.$eval('img', (el: HTMLImageElement) => el.getAttribute('src') || ''),
+                price: await element.$eval('div.flex.grow span', (el: HTMLElement) => el.textContent?.trim() || ''),
+                price_per_unit: await element.$eval('div.flex.grow p', (el: HTMLElement) => el.textContent?.trim() || ''),
+                sale_valid_from: await element.$eval('span.text-xs.text-blue-primary', (el: HTMLElement) => el.textContent?.trim() || '').catch(() => undefined),
+                sale_percentage: await element.$eval('span.md\\:text-md.line-clamp-1', (el: HTMLElement) => el.textContent?.trim() || '').catch(() => undefined)
+              };
+              product.supermarket_data.push(supermarketData);
+            }
+
+            // Upsert product to database
+            const { error } = await supabase
+              .from('products')
+              .upsert(product, { onConflict: 'id' });
+
+            if (error) {
+              console.error(`Error upserting product ${product.id}:`, error);
+            }
+
+            // Add a small delay to avoid overwhelming the server
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (error) {
+            console.error(`Error scraping product ${productUrl}:`, error);
+          }
+        }
+      }
+    } finally {
+      await browser.close();
+    }
   }
 }
 
