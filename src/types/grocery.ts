@@ -65,6 +65,15 @@ export interface CreateGroceryItem {
   household_id: string;
   completed?: boolean;
   product_id?: string | null;
+  stores?: StorePrice[];
+  supermarket?: string | null;
+  current_price?: string | null;
+  original_price?: string | null;
+  sale_type?: string | null;
+  valid_until?: string | null;
+  image_url?: string | null;
+  product_url?: string | null;
+  is_deleted?: boolean;
 }
 
 // Type for saved list items
