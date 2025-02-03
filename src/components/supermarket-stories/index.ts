@@ -1,0 +1,1 @@
+export { SupermarketStories } from './supermarket-stories'; 

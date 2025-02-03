@@ -1,0 +1,76 @@
+name: Weekly Supermarket Offers Scraper
+
+on:
+  schedule:
+    # Run every Monday and Wednesday at 01:00 UTC
+    - cron: '0 1 * * 1,3'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      NODE_ENV: production
+      NODE_OPTIONS: "--max-old-space-size=4096"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Puppeteer dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser xvfb
+
+      - name: Setup virtual display
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+
+      - name: Verify environment variables
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "Error: SUPABASE_URL is not set"
+            exit 1
+          fi
+          if [ -z "$SUPABASE_KEY" ]; then
+            echo "Error: SUPABASE_KEY is not set"
+            exit 1
+          fi
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Error: OPENAI_API_KEY is not set"
+            exit 1
+          fi
+          echo "All required environment variables are set"
+
+      - name: Clear recommendations and run scraper
+        run: |
+          echo "Starting scraping process..."
+          npx tsx src/scripts/scrape-offers.ts
+        timeout-minutes: 20
+
+      - name: Generate embeddings
+        if: success()
+        run: |
+          echo "Generating embeddings..."
+          npx tsx src/scripts/generate-embeddings.ts
+        timeout-minutes: 10
+
+      - name: Handle errors
+        if: failure()
+        run: |
+          echo "Job failed. Please check the environment variables and logs."
+          exit 1 

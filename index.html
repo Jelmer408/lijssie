@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Lijssie - Slimme Boodschappenlijst</title>
+    <base href="/" />
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Deel je boodschappenlijstje en maaltijdvoorstellen met je huisgenoten. Krijg meldingen wanneer iemand onderweg is naar de winkel." />
+    <meta name="keywords" content="boodschappenlijst, maaltijdplanning, huisgenoten, boodschappen, recepten" />
+    
+    <!-- Open Graph Meta Tags (Facebook, LinkedIn, etc) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://lijssie.nl" />
+    <meta property="og:title" content="Lijssie - Slimme Boodschappenlijst" />
+    <meta property="og:description" content="Deel je boodschappenlijstje en maaltijdvoorstellen met je huisgenoten. Krijg meldingen wanneer iemand onderweg is naar de winkel." />
+    <meta property="og:image" content="https://lijssie.nl/logo.png" />
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://lijssie.nl" />
+    <meta name="twitter:title" content="Lijssie - Slimme Boodschappenlijst" />
+    <meta name="twitter:description" content="Deel je boodschappenlijstje en maaltijdvoorstellen met je huisgenoten. Krijg meldingen wanneer iemand onderweg is naar de winkel." />
+    <meta name="twitter:image" content="https://lijssie.nl/logo.png" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#F9FAFB" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    
+    <!-- Prevent flash of unstyled content and hide scrollbars -->
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: #F9FAFB;
+        -webkit-overflow-scrolling: touch;
+        overflow: auto;
+        overscroll-behavior-y: none;
+      }
+
+      #root {
+        min-height: 100vh;
+        background-color: #F9FAFB;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      /* Hide scrollbar for Chrome, Safari and Opera */
+      ::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
+      }
+
+      /* Hide scrollbar for Firefox */
+      * {
+        scrollbar-width: none;
+      }
+
+      /* Hide scrollbar for IE and Edge */
+      * {
+        -ms-overflow-style: none;
+      }
+
+      /* Ensure smooth scrolling behavior */
+      html {
+        scroll-behavior: smooth;
+      }
+
+      /* Additional fixes for mobile */
+      body {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        overflow: hidden;
+      }
+
+      #root {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Splash Screen -->
+    <div id="splash" style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #F8F9FF 0%, #FFFFFF 100%); opacity: 0; animation: fadeIn 0.3s ease forwards;">
+      <!-- Main content container -->
+      <div style="position: relative;">
+        <!-- Animated gradient background -->
+        <div style="position: absolute; inset: 0; background: linear-gradient(to right, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.2), rgba(29, 78, 216, 0.2)); border-radius: 24px; filter: blur(16px); opacity: 0.5; animation: pulseGradient 2s ease-in-out infinite alternate;"></div>
+        
+        <!-- Content wrapper -->
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translateY(20px); animation: slideUp 0.5s ease forwards 0.2s;">
+          <!-- Logo container -->
+          <div style="width: 96px; height: 96px; margin-bottom: 24px; border-radius: 24px; background: white; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); display: flex; align-items: center; justify-content: center; overflow: hidden; transform: scale(0.8); opacity: 0; animation: scaleIn 0.5s ease forwards 0.3s;">
+            <img src="/logo.png" alt="Lijssie Logo" style="width: 80px; height: 80px; object-fit: contain; border-radius: 16px;" />
+          </div>
+
+          <!-- Title with gradient -->
+          <h1 style="font-size: 24px; font-weight: 700; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; background: linear-gradient(to right, #2563EB, #1D4ED8); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; opacity: 0; transform: translateY(10px); animation: fadeSlideUp 0.5s ease forwards 0.4s;">
+            Lijssie
+          </h1>
+
+          <!-- Loading dots -->
+          <div style="margin-top: 32px; display: flex; align-items: center; gap: 4px; opacity: 0; animation: fadeIn 0.5s ease forwards 0.6s;">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #2563EB; animation: bounceDot 1s ease-in-out infinite 0s;"></div>
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #2563EB; animation: bounceDot 1s ease-in-out infinite 0.2s;"></div>
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #1D4ED8; animation: bounceDot 1s ease-in-out infinite 0.4s;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Animation keyframes -->
+    <style>
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes slideUp {
+        from { transform: translateY(20px); }
+        to { transform: translateY(0); }
+      }
+
+      @keyframes scaleIn {
+        from { transform: scale(0.8); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+
+      @keyframes fadeSlideUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      @keyframes pulseGradient {
+        from { 
+          transform: scale(1);
+          opacity: 0.5;
+        }
+        to { 
+          transform: scale(1.1);
+          opacity: 0.3;
+        }
+      }
+
+      @keyframes bounceDot {
+        0%, 100% { 
+          transform: scale(1);
+          opacity: 0.3;
+        }
+        50% { 
+          transform: scale(1.5);
+          opacity: 1;
+        }
+      }
+    </style>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        let refreshing = false;
+
+        // Handle page refresh when a new service worker takes over
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+
+        // Listen for messages from the service worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+          if (event.data && event.data.type === 'CACHE_UPDATED') {
+            // Show update notification or reload page
+            window.location.reload();
+          }
+        });
+
+        window.addEventListener('load', async () => {
+          try {
+            // First, unregister any existing service workers
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map(registration => registration.unregister()));
+            
+            // Check if we're in development mode
+            const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            
+            // Add version parameter to service worker URL
+            const swUrl = '/service-worker.js';
+            const swVersioned = `${swUrl}?v=1.0.0`; // Use fixed version instead of timestamp
+            
+            // Wait a moment before registering new service worker
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Register the service worker
+            const registration = await navigator.serviceWorker.register(swVersioned, {
+              scope: '/',
+              updateViaCache: 'none'
+            });
+            
+            // Check for updates less frequently
+            setInterval(() => {
+              registration.update();
+            }, 24 * 60 * 60 * 1000); // Check for updates once per day
+
+            // Handle updates
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // New content is available, but don't force update
+                  console.log('New service worker available');
+                  // Let the service worker decide when to take over
+                }
+              });
+            });
+
+            console.log('ServiceWorker registration successful with scope:', registration.scope);
+          } catch (error) {
+            console.error('ServiceWorker registration failed:', error);
+          }
+        });
+      }
+    </script>
+  </body>
+</html> 

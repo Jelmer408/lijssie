@@ -1,0 +1,11 @@
+id,created_at,household_id,user_id,role,user_name,email
+25925ab3-608c-49a1-ade6-c7a6babbc640,2024-11-24 11:20:50.949021+00,3f9bc741-8bd0-41cd-bab1-15cbaf79dcb6,03f281c7-5191-473a-bfee-1f3846231646,admin,Kasper van Leeuwen,krmvanleeuwen@gmail.com
+3b17b8fb-a2bd-4746-9e7a-7348c6cd6ae9,2024-11-24 09:19:32.561091+00,3a03edd2-c45f-4d14-af92-03e98c02f417,513f93fe-29bf-4b96-9b9b-5a337d676593,admin,Eva,eva.mb20@gmail.com
+3cb25b80-afa5-4b33-a227-ff218f1a6d13,2024-12-21 15:30:55.899549+00,de22507a-1939-4ecd-a44d-8581ef80c05d,71f9b303-a2c4-453b-9109-5f5197be72ff,member,David Jordens,davidjordens88@gmail.com
+3f73a1aa-cf32-4ac5-84ba-7ce3b59f4922,2024-11-24 10:45:13.760822+00,86169bad-6281-4c3c-a878-75ef84ff9a01,8ed805b3-0942-48a7-a04b-3ff0eb258814,member,Thijs Wolf,thijswolf2003@gmail.com
+4f0ee153-bd45-478c-90cb-f99c59a59b6c,2024-11-23 19:46:44.158564+00,86169bad-6281-4c3c-a878-75ef84ff9a01,56074622-04d1-4b47-9a15-04755df22449,member,Tijmen,tlwassink@gmail.com
+63979d3c-6bb2-4c3b-ba5e-933ff4c3466c,2024-11-23 16:04:34.173813+00,86169bad-6281-4c3c-a878-75ef84ff9a01,a76a39c4-4123-467a-a4bb-9be3a576b282,member,Maarten Smit,maartensmit90@gmail.com
+89690a5f-8cd6-444a-b6e6-4ce8dcba8eab,2024-11-23 23:10:16.301285+00,122d8743-6315-4e94-8dae-4a04877584cb,201a45af-a3a1-45e1-9021-0e8607c53f6c,admin,Tietia Bakker,tietiabakker@gmail.com
+eb73a736-a672-4610-bfa4-e8944e2dea76,2024-12-20 17:38:30.136957+00,de22507a-1939-4ecd-a44d-8581ef80c05d,5654df36-85a6-4fb1-90a7-ba712b3e9707,admin,Irene Blankestijn,irene.blankestijn@gmail.com
+ed1b00c4-d81d-4639-941c-d4c7111d1ce9,2024-11-24 17:42:51.302173+00,0f2ff018-bad6-4c43-a09e-37b4646dfc27,75379636-5568-4a05-ab11-3f0ab30a2156,admin,Luuk Jonk,luukjonk1@gmail.com
+eedc8603-a22b-4b7e-b414-391de1c12fe1,2024-11-23 13:41:19.756313+00,86169bad-6281-4c3c-a878-75ef84ff9a01,a1b437a0-643a-41f0-ab3e-29ead1868882,admin,Jan Poesje,janpoesje04@gmail.com
