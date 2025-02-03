@@ -53,7 +53,7 @@ const StoreSettingsModal: React.FC<StoreSettingsModalProps> = ({
   subscriptionStatus = 'free',
   householdId
 }) => {
-  const defaultStores = [
+  const defaultStores: Store[] = [
     { name: 'Albert Heijn', logo: '/supermarkets/ah-logo.png', isSelected: true },
     { name: 'Jumbo', logo: '/supermarkets/jumbo-logo.png', isSelected: true },
     { name: 'Plus', logo: '/supermarkets/plus-logo.png', isSelected: true },
@@ -63,7 +63,7 @@ const StoreSettingsModal: React.FC<StoreSettingsModalProps> = ({
     { name: 'DekaMarkt', logo: '/supermarkets/dekamarkt-logo.png', isSelected: true },
     { name: 'Vomar', logo: '/supermarkets/vomar-logo.png', isSelected: true },
     { name: 'Poiesz', logo: '/supermarkets/poiesz-logo.png', isSelected: true },
-    { name: 'Hoogvliet', logo: '/supermarkets/hoogvliet-logo.png', isSelected: true },
+    { name: 'Hoogvliet', logo: '/supermarkets/hoogvliet-logo.png', isSelected: true }
   ];
 
   const [stores, setStores] = useState<Store[]>(defaultStores);

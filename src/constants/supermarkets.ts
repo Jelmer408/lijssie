@@ -6,7 +6,7 @@ export interface Supermarket {
 }
 
 export const supermarkets: Record<string, Supermarket> = {
-  'ah': {
+  'Albert Heijn': {
     id: 'ah',
     name: 'Albert Heijn',
     logo: '/supermarkets/ah-logo.png',
