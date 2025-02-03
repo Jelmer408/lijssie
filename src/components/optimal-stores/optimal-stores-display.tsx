@@ -11,6 +11,16 @@ interface OptimalStoresDisplayProps {
   storeProductCounts: Record<string, number>;
 }
 
+// Helper function to get the correct logo filename
+function getStoreLogo(storeName: string): string {
+  const name = storeName.toLowerCase();
+  if (name === 'albert heijn' || name.includes('ah')) {
+    return '/supermarkets/ah-logo.png';
+  }
+  // For other stores, use the standard format
+  return `/supermarkets/${name.replace(/\s+/g, '')}-logo.png`;
+}
+
 export function OptimalStoresDisplay({ 
   optimalStores, 
   totalPrice,
@@ -63,7 +73,7 @@ export function OptimalStoresDisplay({
             >
               <div className="w-5 h-5 rounded-lg bg-white border border-gray-100 shadow-sm overflow-hidden flex-shrink-0">
                 <img
-                  src={`/supermarkets/${store.toLowerCase()}-logo.png`}
+                  src={getStoreLogo(store)}
                   alt={store}
                   className="w-full h-full object-contain"
                 />
