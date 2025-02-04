@@ -6,12 +6,11 @@ import { AuthProvider } from '@/lib/auth';
 import { HouseholdProvider } from '@/contexts/household-context';
 import { NotificationProvider } from '@/contexts/notification-context';
 import { NotificationPrompt } from '@/components/NotificationPrompt';
-import { GroceryListAppComponent } from '@/components/grocery-list-app';
 import { LandingPage } from '@/components/auth/LandingPage';
 import { LoginPage } from '@/components/auth/LoginPage';
 import { HouseholdPage } from '@/components/pages/HouseholdPage';
 import { KokenPage } from '@/components/pages/KokenPage';
-import DemoProductPage from '@/pages/demo-product';
+import MainPage from '@/pages/index';
 import { useAuth } from '@/lib/auth';
 
 // Check if app is running as PWA
@@ -31,7 +30,7 @@ function App() {
                   path="/"
                   element={
                     <ProtectedRoute>
-                      <GroceryListAppComponent />
+                      <MainPage />
                     </ProtectedRoute>
                   }
                 />
@@ -49,14 +48,6 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <KokenPage />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/demo-product" 
-                  element={
-                    <ProtectedRoute>
-                      <DemoProductPage />
                     </ProtectedRoute>
                   } 
                 />
