@@ -1622,7 +1622,7 @@ const MainPage = () => {
         setIsAddProductDrawerOpen={setIsAddProductDrawerOpen}
       />
 
-      <main className="px-4 pb-24 pt-4">
+      <main className="px-4 pb-32 pt-4">
         {renderMainContent()}
       </main>
 
