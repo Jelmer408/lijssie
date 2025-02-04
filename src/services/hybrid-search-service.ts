@@ -1,108 +1,121 @@
-import { supabase } from '@/lib/supabase';
 import { GroceryItem } from '@/types/grocery';
-import OpenAI from 'openai';
+import { productsService } from './products-service';
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
-});
-
-interface SaleItem {
-  id: string;
-  supermarket: 'ah' | 'jumbo' | 'dirk';
-  product_name: string;
-  description: string | null;
-  original_price: number | null;
-  offer_price: number;
-  discount_percentage: number | null;
-  sale_type: string | null;
-  valid_from: string;
-  valid_until: string;
-  image_url: string | null;
-  similarity: number;
-}
-
-interface HybridSearchResult {
+interface SearchResult {
   groceryItem: GroceryItem;
   recommendations: Array<{
     saleItem: {
       id: string;
-      supermarket: 'ah' | 'jumbo' | 'dirk';
       productName: string;
-      description: string | null;
-      originalPrice: number | null;
-      currentPrice: number;
-      discountPercentage: number | null;
-      saleType: string | null;
-      validFrom: string;
-      validUntil: string;
-      imageUrl: string | null;
+      supermarkets: Array<{
+        name: string;
+        currentPrice: string;
+        originalPrice: string;
+        saleType?: string;
+        validUntil?: string;
+        savingsPercentage: number;
+      }>;
+      currentPrice: string;
+      originalPrice: string;
+      saleType?: string;
+      validUntil?: string;
+      imageUrl?: string;
     };
     reason: string;
     savingsPercentage: number;
   }>;
 }
 
-export const hybridSearchService = {
-  async searchSaleItems(groceryItems: GroceryItem[]): Promise<HybridSearchResult[]> {
-    const results: HybridSearchResult[] = [];
+class HybridSearchService {
+  async searchSaleItems(groceryItems: GroceryItem[]): Promise<SearchResult[]> {
+    const results: SearchResult[] = [];
 
     for (const item of groceryItems) {
-      try {
-        // Generate embedding for the grocery item
-        const embeddingResponse = await openai.embeddings.create({
-          model: 'text-embedding-3-small',
-          input: item.name,
-          dimensions: 384,
+      // Find products on sale in the same subcategory
+      const productsOnSale = await productsService.findProductsOnSale(item.subcategory || '');
+
+      // Map products to recommendations format
+      const recommendations = productsOnSale.map(product => ({
+        saleItem: {
+          id: product.id,
+          productName: product.title,
+          supermarkets: product.supermarkets,
+          currentPrice: product.currentPrice,
+          originalPrice: product.originalPrice,
+          saleType: product.saleType,
+          validUntil: product.validUntil,
+          imageUrl: product.image_url
+        },
+        reason: `${product.savingsPercentage}% korting op ${product.title}`,
+        savingsPercentage: product.savingsPercentage
+      }));
+
+      if (recommendations.length > 0) {
+        results.push({
+          groceryItem: item,
+          recommendations
         });
-
-        const [{ embedding }] = embeddingResponse.data;
-
-        // Perform hybrid search using Supabase with adjusted weights
-        const { data: saleItems, error } = await supabase.rpc('hybrid_search', {
-          query_text: item.name,
-          query_embedding: embedding,
-          match_count: 30,
-          full_text_weight: 0.7,
-          semantic_weight: 1.3
-        });
-
-        if (error) throw error;
-
-        // Transform and filter results with a lower similarity threshold
-        const recommendations = (saleItems as SaleItem[])
-          .filter(sale => sale.similarity > 0.3)
-          .map(sale => ({
-            saleItem: {
-              id: sale.id,
-              supermarket: sale.supermarket,
-              productName: sale.product_name,
-              description: sale.description,
-              originalPrice: sale.original_price,
-              currentPrice: sale.offer_price,
-              discountPercentage: sale.discount_percentage,
-              saleType: sale.sale_type,
-              validFrom: sale.valid_from,
-              validUntil: sale.valid_until,
-              imageUrl: sale.image_url
-            },
-            reason: `Found matching sale at ${sale.supermarket}`,
-            savingsPercentage: sale.discount_percentage || Math.round(
-              ((sale.original_price! - sale.offer_price) / sale.original_price!) * 100
-            )
-          }));
-
-        if (recommendations.length > 0) {
-          results.push({
-            groceryItem: item,
-            recommendations
-          });
-        }
-      } catch (error) {
-        console.error(`Error searching for ${item.name}:`, error);
       }
     }
 
     return results;
   }
-}; 
+
+  async searchSingleItem(searchTerm: string): Promise<SearchResult[]> {
+    // Search for products on sale that match the search term
+    const productsOnSale = await productsService.searchProductsOnSale(searchTerm);
+
+    // Map products to recommendations format
+    const recommendations = productsOnSale.map(product => ({
+      saleItem: {
+        id: product.id,
+        productName: product.title,
+        supermarkets: product.supermarkets,
+        currentPrice: product.currentPrice,
+        originalPrice: product.originalPrice,
+        saleType: product.saleType,
+        validUntil: product.validUntil,
+        imageUrl: product.image_url
+      },
+      reason: `${product.savingsPercentage}% korting op ${product.title}`,
+      savingsPercentage: product.savingsPercentage
+    }));
+
+    if (recommendations.length > 0) {
+      return [{
+        groceryItem: {
+          id: 'search',
+          name: searchTerm,
+          emoji: '🔍',
+          completed: false,
+          category: 'Overig',
+          subcategory: '',
+          quantity: '',
+          priority: false,
+          household_id: '',
+          user_id: '',
+          user_name: '',
+          user_avatar: '',
+          created_at: new Date().toISOString(),
+          updated_at: '',
+          supermarket: '',
+          unit: '',
+          current_price: '',
+          original_price: '',
+          sale_type: '',
+          valid_until: '',
+          image_url: '',
+          is_deleted: false,
+          product_url: '',
+          product_id: '',
+          stores: []
+        },
+        recommendations
+      }];
+    }
+
+    return [];
+  }
+}
+
+export const hybridSearchService = new HybridSearchService(); 
