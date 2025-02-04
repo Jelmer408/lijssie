@@ -1246,7 +1246,7 @@ const MainPage = () => {
   useEffect(() => {
     const newOptimalStores = calculateOptimalStores();
     setOptimalStores(newOptimalStores);
-  }, [calculateOptimalStores]);
+  }, [calculateOptimalStores, householdSettings]);
 
   useEffect(() => {
     async function fetchHousehold() {
@@ -1344,6 +1344,9 @@ const MainPage = () => {
             }) => {
               if (payload.eventType === 'DELETE') {
                 setHouseholdSettings(null);
+                // Recalculate with null settings
+                const newOptimalStores = calculateOptimalStores();
+                setOptimalStores(newOptimalStores);
                 return;
               }
 
@@ -1356,6 +1359,10 @@ const MainPage = () => {
                   ...store,
                   isSelected: newSettings.selected_stores?.find(s => s.name === store.name)?.isSelected ?? true
                 })));
+                
+                // Explicitly recalculate optimal stores with new settings
+                const newOptimalStores = calculateOptimalStores();
+                setOptimalStores(newOptimalStores);
               }
             }
           )
