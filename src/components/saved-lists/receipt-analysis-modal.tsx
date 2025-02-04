@@ -12,7 +12,7 @@ import { GroceryItem } from '@/types/grocery-item'
 import { useAuth } from '@/contexts/auth-context'
 import { savedListsService } from '@/services/saved-lists-service'
 import { receiptVisionService } from '@/services/receipt-vision-service'
-import { Category, isCategory } from '@/constants/categories'
+import { isCategory } from '@/constants/categories'
 
 interface ReceiptAnalysisModalProps {
   isOpen: boolean;

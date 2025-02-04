@@ -13,6 +13,25 @@ interface GroceryItem {
 const GroceryList: React.FC = () => {
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
 
+  // Initial fetch of items
+  useEffect(() => {
+    const fetchItems = async () => {
+      const { data, error } = await supabase
+        .from('grocery_items')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching items:', error);
+        return;
+      }
+
+      setGroceryItems(data || []);
+    };
+
+    fetchItems();
+  }, []);
+
   useEffect(() => {
     // Set up real-time subscription for grocery items
     const subscription = supabase
@@ -28,18 +47,18 @@ const GroceryList: React.FC = () => {
           // Handle different types of changes
           switch (payload.eventType) {
             case 'UPDATE':
-              setGroceryItems(current => 
-                current.map(item => 
+              setGroceryItems((current: GroceryItem[]) => 
+                current.map((item: GroceryItem) => 
                   item.id === payload.new.id ? { ...item, ...payload.new } : item
                 )
               );
               break;
             case 'INSERT':
-              setGroceryItems(current => [...current, payload.new as GroceryItem]);
+              setGroceryItems((current: GroceryItem[]) => [...current, payload.new as GroceryItem]);
               break;
             case 'DELETE':
-              setGroceryItems(current => 
-                current.filter(item => item.id !== payload.old.id)
+              setGroceryItems((current: GroceryItem[]) => 
+                current.filter((item: GroceryItem) => item.id !== payload.old.id)
               );
               break;
           }
@@ -54,8 +73,32 @@ const GroceryList: React.FC = () => {
   }, []);
 
   return (
-    <div>
-      {/* Render your grocery items here */}
+    <div className="space-y-4">
+      <h2 className="text-xl font-semibold">Boodschappenlijst</h2>
+      {groceryItems.length === 0 ? (
+        <p className="text-gray-500">Geen items in je boodschappenlijst.</p>
+      ) : (
+        <ul className="space-y-2">
+          {groceryItems.map((item) => (
+            <li 
+              key={item.id}
+              className="p-4 bg-white rounded-lg shadow-sm border border-gray-100"
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-medium">{item.name}</h3>
+                  {item.category && (
+                    <p className="text-sm text-gray-500">{item.category}</p>
+                  )}
+                </div>
+                <span className="text-sm text-gray-400">
+                  {new Date(item.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

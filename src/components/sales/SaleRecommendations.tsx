@@ -199,6 +199,26 @@ export function SaleRecommendations({ groceryList, householdName }: SaleRecommen
         emoji: '🔍',
         completed: false,
         category: 'Overig',
+        subcategory: '',
+        quantity: '',
+        priority: false,
+        household_id: '',
+        user_id: '',
+        user_name: '',
+        user_avatar: '',
+        created_at: new Date().toISOString(),
+        updated_at: '',
+        supermarket: '',
+        unit: '',
+        current_price: '',
+        original_price: '',
+        sale_type: '',
+        valid_until: '',
+        image_url: '',
+        is_deleted: false,
+        product_url: '',
+        product_id: '',
+        stores: []
       }]);
       
       // Filter out irrelevant matches based on similarity
