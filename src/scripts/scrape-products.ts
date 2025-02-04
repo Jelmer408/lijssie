@@ -76,7 +76,7 @@ async function upsertProduct(product: Product) {
       category: product.category,
       subcategory: product.subcategory,
       main_category: product.mainCategory,
-      supermarket_data: JSON.stringify(product.supermarkets), // Explicitly convert to JSON string
+      supermarket_data: product.supermarkets,
       last_updated: now,
       url: product.itemUrl,
       updated_at: now
@@ -87,8 +87,16 @@ async function upsertProduct(product: Product) {
       const { error: updateError } = await supabase
         .from('products')
         .update({
-          ...productData,
-          supermarket_data: JSON.stringify(product.supermarkets) // Ensure JSON string format
+          title: product.name,
+          image_url: product.imageUrl,
+          quantity_info: product.weight,
+          category: product.category,
+          subcategory: product.subcategory,
+          main_category: product.mainCategory,
+          supermarket_data: product.supermarkets,
+          last_updated: now,
+          url: product.itemUrl,
+          updated_at: now
         })
         .eq('id', existingProducts[0].id);
 
@@ -103,12 +111,20 @@ async function upsertProduct(product: Product) {
       const id = Math.floor(Math.random() * 1000000000000).toString();
       const { error: insertError } = await supabase
         .from('products')
-        .insert({
+        .insert([{
           id,
-          ...productData,
-          supermarket_data: JSON.stringify(product.supermarkets), // Ensure JSON string format
-          created_at: now
-        });
+          title: product.name,
+          image_url: product.imageUrl,
+          quantity_info: product.weight,
+          category: product.category,
+          subcategory: product.subcategory,
+          main_category: product.mainCategory,
+          supermarket_data: product.supermarkets,
+          last_updated: now,
+          url: product.itemUrl,
+          created_at: now,
+          updated_at: now
+        }]);
 
       if (insertError) {
         console.error('Error inserting product into products table:', insertError);
