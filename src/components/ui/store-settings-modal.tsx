@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { groceryService } from '@/services/grocery-service';
 import { toast } from "@/components/ui/use-toast";
 import { GroceryItem } from '@/types/grocery';
+import { useAuth } from '@/lib/auth';
 
 interface Store {
   name: string;
@@ -24,7 +25,6 @@ interface StoreSettingsModalProps {
   onSave: (selectedStores: Store[], maxStores: number) => void;
   showPriceFeatures: boolean;
   onPriceFeaturesChange: (enabled: boolean) => void;
-  subscriptionStatus?: 'free' | 'premium';
   householdId: string;
 }
 
@@ -50,9 +50,12 @@ const StoreSettingsModal: React.FC<StoreSettingsModalProps> = ({
   onSave, 
   showPriceFeatures, 
   onPriceFeaturesChange,
-  subscriptionStatus = 'free',
   householdId
 }) => {
+  const { user } = useAuth();
+  const [isPremium, setIsPremium] = useState(false);
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(true);
+
   const defaultStores: Store[] = [
     { name: 'Albert Heijn', logo: '/supermarkets/ah-logo.png', isSelected: true },
     { name: 'Jumbo', logo: '/supermarkets/jumbo-logo.png', isSelected: true },
@@ -74,6 +77,28 @@ const StoreSettingsModal: React.FC<StoreSettingsModalProps> = ({
   const [, setIsLoading] = useState(true);
   const [, setError] = useState<Error | null>(null);
   const [items, setItems] = useState<GroceryItem[]>([]);
+
+  useEffect(() => {
+    const checkSubscriptionStatus = async () => {
+      if (!user) {
+        setIsPremium(false);
+        setIsCheckingSubscription(false);
+        return;
+      }
+
+      try {
+        // Allow access for specific user ID
+        setIsPremium(user.id === '818241c5-63b2-41de-9a46-8291bb23296d');
+      } catch (err) {
+        console.error('Error checking subscription status:', err);
+        setIsPremium(false);
+      } finally {
+        setIsCheckingSubscription(false);
+      }
+    };
+
+    checkSubscriptionStatus();
+  }, [user]);
 
   useEffect(() => {
     async function loadSettings() {
@@ -285,6 +310,19 @@ const StoreSettingsModal: React.FC<StoreSettingsModalProps> = ({
     }
   };
 
+  // If checking subscription status, show loading state
+  if (isCheckingSubscription) {
+    return (
+      <Drawer open={isOpen} onOpenChange={onClose} shouldScaleBackground>
+        <DrawerContent className="h-[95vh]">
+          <div className="flex items-center justify-center h-full">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
   // For demo product page, always show the premium version
   if (window.location.pathname === '/demo-product') {
     return (
@@ -486,7 +524,7 @@ const StoreSettingsModal: React.FC<StoreSettingsModalProps> = ({
   }
 
   // For authenticated pages, check subscription status
-  if (subscriptionStatus !== 'premium') {
+  if (!isPremium) {
     return (
       <Drawer open={isOpen} onOpenChange={onClose} shouldScaleBackground>
         <DrawerContent className="h-[95vh]">
