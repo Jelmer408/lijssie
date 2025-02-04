@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { GroceryItem } from '@/types/grocery';
 
 interface OptimalStoresDisplayProps {
   optimalStores: string[] | null;

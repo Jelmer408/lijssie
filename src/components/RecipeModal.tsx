@@ -237,7 +237,10 @@ export function RecipeModal({
         completed: false,
         user_id: user.id,
         user_name: profile?.full_name || user.email,
-        user_avatar: profile?.avatar_url || null
+        user_avatar: profile?.avatar_url || null,
+        subcategory: null,
+        unit: normalizeUnit(ingredient.unit),
+        household_id: householdId
       };
 
       await groceryService.addItem(item, householdId);
@@ -293,7 +296,10 @@ export function RecipeModal({
           completed: false,
           user_id: user.id,
           user_name: profile?.full_name || user.email,
-          user_avatar: profile?.avatar_url || null
+          user_avatar: profile?.avatar_url || null,
+          subcategory: null,
+          unit: normalizeUnit(ingredient.unit),
+          household_id: householdId
         };
         
         await groceryService.addItem(item, householdId);
