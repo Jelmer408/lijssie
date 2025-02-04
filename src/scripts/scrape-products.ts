@@ -68,67 +68,55 @@ async function upsertProduct(product: Product) {
       return;
     }
 
+    // Prepare the data with explicit typing for JSONB
     const now = new Date().toISOString();
-    const productData = {
-      title: product.name,
-      image_url: product.imageUrl,
-      quantity_info: product.weight,
-      category: product.category,
-      subcategory: product.subcategory,
-      main_category: product.mainCategory,
-      supermarket_data: product.supermarkets,
-      last_updated: now,
-      url: product.itemUrl,
-      updated_at: now
-    };
+    const supermarketData = product.supermarkets.map(sm => ({
+      name: sm.name,
+      logoUrl: sm.logoUrl,
+      price: sm.price,
+      pricePerUnit: sm.pricePerUnit,
+      ...(sm.offerText ? { offerText: sm.offerText } : {}),
+      ...(sm.offerEndDate ? { offerEndDate: sm.offerEndDate } : {})
+    }));
 
     if (existingProducts && existingProducts.length > 0) {
-      // Update existing product in products table
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({
-          title: product.name,
-          image_url: product.imageUrl,
-          quantity_info: product.weight,
-          category: product.category,
-          subcategory: product.subcategory,
-          main_category: product.mainCategory,
-          supermarket_data: product.supermarkets,
-          last_updated: now,
-          url: product.itemUrl,
-          updated_at: now
-        })
-        .eq('id', existingProducts[0].id);
+      // Direct SQL query for update to ensure we're hitting the right table
+      const { error: updateError } = await supabase.rpc('update_product', {
+        p_id: existingProducts[0].id,
+        p_title: product.name,
+        p_image_url: product.imageUrl,
+        p_quantity_info: product.weight,
+        p_category: product.category,
+        p_subcategory: product.subcategory,
+        p_main_category: product.mainCategory,
+        p_supermarket_data: supermarketData,
+        p_last_updated: now,
+        p_url: product.itemUrl
+      });
 
       if (updateError) {
         console.error('Error updating product in products table:', updateError);
-        console.error('Failed product data:', JSON.stringify(productData, null, 2));
       } else {
         console.log(`Updated product in products table: ${product.name} (${existingProducts[0].id})`);
       }
     } else {
-      // Insert new product into products table
+      // Direct SQL query for insert to ensure we're hitting the right table
       const id = Math.floor(Math.random() * 1000000000000).toString();
-      const { error: insertError } = await supabase
-        .from('products')
-        .insert([{
-          id,
-          title: product.name,
-          image_url: product.imageUrl,
-          quantity_info: product.weight,
-          category: product.category,
-          subcategory: product.subcategory,
-          main_category: product.mainCategory,
-          supermarket_data: product.supermarkets,
-          last_updated: now,
-          url: product.itemUrl,
-          created_at: now,
-          updated_at: now
-        }]);
+      const { error: insertError } = await supabase.rpc('insert_product', {
+        p_id: id,
+        p_title: product.name,
+        p_image_url: product.imageUrl,
+        p_quantity_info: product.weight,
+        p_category: product.category,
+        p_subcategory: product.subcategory,
+        p_main_category: product.mainCategory,
+        p_supermarket_data: supermarketData,
+        p_last_updated: now,
+        p_url: product.itemUrl
+      });
 
       if (insertError) {
         console.error('Error inserting product into products table:', insertError);
-        console.error('Failed product data:', JSON.stringify({ id, ...productData }, null, 2));
       } else {
         console.log(`Inserted new product into products table: ${product.name} (${id})`);
       }
