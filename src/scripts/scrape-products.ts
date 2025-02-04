@@ -42,26 +42,59 @@ interface Product {
 
 async function saveProduct(product: Product) {
   try {
-    const id = Math.floor(Math.random() * 1000000000000).toString();
-
-    const { error } = await supabase
+    // First, try to find an existing product with the same URL
+    const { data: existingProducts, error: searchError } = await supabase
       .from('products')
-      .insert({
-        id,
-        title: product.name,
-        image_url: product.imageUrl,
-        quantity_info: product.weight,
-        category: product.category,
-        subcategory: product.subcategory,
-        main_category: product.mainCategory,
-        supermarket_data: product.supermarkets,
-        last_updated: new Date().toISOString(),
-        url: product.itemUrl
-      });
+      .select('id')
+      .eq('url', product.itemUrl)
+      .limit(1);
 
-    if (error) {
-      console.error('Error storing product:', error);
-      console.error('Failed product data:', JSON.stringify(product, null, 2));
+    if (searchError) {
+      console.error('Error searching for existing product:', searchError);
+      return;
+    }
+
+    const productData = {
+      title: product.name,
+      image_url: product.imageUrl,
+      quantity_info: product.weight,
+      category: product.category,
+      subcategory: product.subcategory,
+      main_category: product.mainCategory,
+      supermarket_data: product.supermarkets,
+      last_updated: new Date().toISOString(),
+      url: product.itemUrl
+    };
+
+    if (existingProducts && existingProducts.length > 0) {
+      // Update existing product
+      const { error: updateError } = await supabase
+        .from('products')
+        .update(productData)
+        .eq('id', existingProducts[0].id);
+
+      if (updateError) {
+        console.error('Error updating product:', updateError);
+        console.error('Failed product data:', JSON.stringify(product, null, 2));
+      } else {
+        console.log(`Updated existing product: ${product.name}`);
+      }
+    } else {
+      // Insert new product
+      const id = Math.floor(Math.random() * 1000000000000).toString();
+      const { error: insertError } = await supabase
+        .from('products')
+        .insert({
+          id,
+          ...productData
+        });
+
+      if (insertError) {
+        console.error('Error inserting new product:', insertError);
+        console.error('Failed product data:', JSON.stringify(product, null, 2));
+      } else {
+        console.log(`Inserted new product: ${product.name}`);
+      }
     }
   } catch (error) {
     console.error(`Failed to save product ${product.name}:`, error);
