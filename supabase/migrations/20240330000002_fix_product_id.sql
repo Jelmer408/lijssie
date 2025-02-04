@@ -34,12 +34,14 @@ alter table public.products enable row level security;
 -- Allow anonymous read access
 create policy "Allow anonymous read access"
 on public.products for select
-to anon
 using (true);
 
 -- Allow service role full access
 create policy "Allow service role full access"
 on public.products for all
-to service_role
 using (true)
-with check (true); 
+with check (true);
+
+-- Grant necessary permissions
+grant usage on schema public to service_role;
+grant all privileges on public.products to service_role; 
