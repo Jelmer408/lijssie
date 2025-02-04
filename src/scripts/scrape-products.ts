@@ -43,40 +43,6 @@ interface Product {
   itemUrl?: string;
 }
 
-async function deleteAllProducts() {
-  // Only delete products in the first chunk to avoid conflicts
-  if (chunkIndex === 0) {
-    try {
-      // First, delete all grocery items that reference products
-      const { error: groceryItemsError } = await supabase
-        .from('grocery_items')
-        .delete()
-        .neq('id', '0');
-
-      if (groceryItemsError) {
-        console.error('Failed to delete grocery items:', groceryItemsError);
-        throw groceryItemsError;
-      }
-      console.log('Successfully deleted all grocery items');
-
-      // Then delete all products
-      const { error: productsError } = await supabase
-        .from('products')
-        .delete()
-        .neq('id', '0');
-
-      if (productsError) {
-        console.error('Failed to delete products:', productsError);
-        throw productsError;
-      }
-      console.log('Successfully deleted all products');
-    } catch (error) {
-      console.error('Failed to delete all products:', error);
-      throw error;
-    }
-  }
-}
-
 async function upsertProduct(product: Product) {
   try {
     // First, check if product exists by URL
@@ -148,7 +114,6 @@ async function scrapeProducts() {
 
   try {
     console.log('Starting Product Scraper');
-    await deleteAllProducts();
 
     await page.goto(supermarketUrl, { waitUntil: 'networkidle2' });
 
