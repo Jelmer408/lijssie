@@ -2,7 +2,7 @@ name: Scrape Products
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Run daily at midnight
+    - cron: '0 0 * * 1,3'  # Run at midnight (00:00) on Monday (1) and Wednesday (3)
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
