@@ -2,53 +2,83 @@ name: Scrape Products
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Run daily at midnight
-  workflow_dispatch:  # Allow manual trigger
+    - cron: '0 0 * * *'  # Run daily at midnight UTC
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  scrape:
+  prepare:
     runs-on: ubuntu-latest
-
-    env:
-      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-
+    outputs:
+      total_chunks: '40'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v3
+      
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
-          cache: 'npm'
-
+          node-version: '18'
+          
       - name: Install dependencies
-        run: |
-          npm ci
-          echo "Node.js version: $(node -v)"
-          echo "NPM version: $(npm -v)"
-
-      - name: Install Puppeteer dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser
-
-      - name: Validate environment variables
-        run: |
-          if [ -z "$SUPABASE_URL" ]; then
-            echo "Error: SUPABASE_URL is not set"
-            exit 1
-          fi
-          if [ -z "$SUPABASE_KEY" ]; then
-            echo "Error: SUPABASE_KEY is not set"
-            exit 1
-          fi
-          echo "Environment variables validated successfully"
-
-      - name: Run scraper
-        run: |
-          echo "Starting product scraper..."
-          npx tsx src/scripts/scrape-products.ts
+        run: npm install
+        
+      - name: Fetch and split categories
+        run: node src/scripts/get-categories.ts
         env:
-          NODE_ENV: production 
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          
+      - name: Upload category chunks
+        uses: actions/upload-artifact@v3
+        with:
+          name: category-chunks
+          path: category-chunks/
+          retention-days: 1
+
+  scrape:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        chunk_index: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39]
+      fail-fast: false  # Continue with other jobs if one fails
+      
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Download category chunks
+        uses: actions/download-artifact@v3
+        with:
+          name: category-chunks
+          path: category-chunks
+          
+      - name: Run scraper for chunk
+        run: node src/scripts/scrape-products.ts
+        env:
+          CHUNK_INDEX: ${{ matrix.chunk_index }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          
+      - name: Upload scraping results
+        uses: actions/upload-artifact@v3
+        with:
+          name: scraping-results-${{ matrix.chunk_index }}
+          path: scraping-results/
+          retention-days: 7
+
+  cleanup:
+    needs: [prepare, scrape]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Delete category chunks artifact
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: category-chunks 
