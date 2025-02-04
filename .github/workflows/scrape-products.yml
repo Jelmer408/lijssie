@@ -19,10 +19,12 @@ jobs:
           node-version: '18'
           
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          npm install -g typescript ts-node
         
       - name: Fetch and split categories
-        run: node src/scripts/get-categories.ts
+        run: ts-node src/scripts/get-categories.ts
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -51,7 +53,9 @@ jobs:
           node-version: '18'
           
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          npm install -g typescript ts-node
         
       - name: Download category chunks
         uses: actions/download-artifact@v4
@@ -60,7 +64,7 @@ jobs:
           path: category-chunks
           
       - name: Run scraper for chunk
-        run: node src/scripts/scrape-products.ts
+        run: ts-node src/scripts/scrape-products.ts
         env:
           CHUNK_INDEX: ${{ matrix.chunk_index }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
