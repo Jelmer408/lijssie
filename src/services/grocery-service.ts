@@ -369,6 +369,34 @@ class GroceryService {
     
     return combinations;
   }
+
+  async addGroceryItem(item: Partial<GroceryItem>): Promise<GroceryItem> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      const newItem = {
+        ...item,
+        user_id: user.id,
+        user_name: user.user_metadata?.full_name || user.email,
+        user_avatar: user.user_metadata?.avatar_url,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('grocery_items')
+        .insert(newItem)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error adding grocery item:', error);
+      throw error;
+    }
+  }
 }
 
 export const groceryService = new GroceryService(); 

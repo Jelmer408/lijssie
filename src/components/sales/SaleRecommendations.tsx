@@ -1,16 +1,82 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GroceryItem } from '@/types/grocery';
-import { Loader2, ChevronDown, ArrowRightLeft, Check, Search, X, MessageSquareWarning } from 'lucide-react';
+import { Loader2, ChevronDown, ArrowRightLeft, Check, Search, X, MessageSquareWarning, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { hybridSearchService } from '@/services/hybrid-search-service';
 import Fuse from 'fuse.js';
+import { groceryService } from '@/services/grocery-service';
+import { CATEGORIES, Category } from '@/constants/categories';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Get API key from environment variable
+const GOOGLE_AI_KEY = import.meta.env.VITE_GOOGLE_AI_KEY;
+const GOOGLE_AI_MODEL = import.meta.env.VITE_GOOGLE_AI_MODEL || 'gemini-pro';
+
+// Initialize the Gemini AI client with API key
+const genAI = new GoogleGenerativeAI(GOOGLE_AI_KEY);
+const model = genAI.getGenerativeModel({ model: GOOGLE_AI_MODEL });
+
+// Helper function to get subcategories for a main category
+function getSubcategoriesForMainCategory(mainCategory: string): string[] {
+  switch (mainCategory) {
+    case 'Aardappel, groente en fruit':
+      return ['Aardappelen', 'Groente', 'Fruit', 'Diepvries groente', 'Diepvries fruit', 'Gezonde kruiden', 'Snackgroente en snackfruit', 'Fruitsalde', 'Smoothies en sappen'];
+    case 'Salades en maaltijden':
+      return ['Salades', 'Kant en klare maaltijden', 'Quiches', 'Ovenschotels', 'Poffertjes en pannenkoeken', 'Pizza', 'Verse soepen', 'Verspakketten', 'Diepvries kant en klare maaltijden', 'Snel snacken', 'Sandwiches', 'Sushi'];
+    case 'Kaas, vleeswaren en tapas':
+      return ['Kaas', 'Vleeswaren', 'Hummus', 'Borrelhapjes', 'Droge worst', 'Dips en smeersels'];
+    case 'Vlees, kip en vis':
+      return ['Vlees', 'Vis', 'Rundvlees', 'Varkensvlees', 'Kip', 'Kalkoen', 'Halal', 'BBQ en Gourmet', 'Reepjes en blokjes vlees', 'Worst', 'Schelpdieren', 'Kalfsvlees en wild'];
+    case 'Vegetarisch, plantaardig en vegan':
+      return ['Vleesvervangers', 'Plantaardige', 'Visvervangers', 'Vegetarische en plantaardige vleeswaren', 'Tofu', 'Vegetarische spreads', 'Plantaardige spreads', 'Vegetarische snack', 'Plantaardige kaas'];
+    case 'Zuivel, boter en eieren':
+      return ['Zuivel', 'Eieren', 'Kaas', 'Boter en margarine', 'Melk', 'High Protein zuivel', 'Yoghurt en kwark', 'Koffiemelk en room', 'Toetjes', 'Drinkyohurt', 'Lactosevrijve zuivel', 'Zuivel tussendoortjes'];
+    case 'Broden, bakkerij en banket':
+      return ['Brood', 'Gebak en taart', 'Broodvervangers', 'Crackers en beschuit', 'Afbakbrood', 'Koek en cake', 'Toastcrackers', 'Koolhydraatarm en glutenvrij'];
+    case 'Ontbijtgranen en beleg':
+      return ['Ontbijtgranen', 'Zoet beleg', 'Broodsalades', 'Hartig broodbeleg', 'Vleeswaren beleg', 'Kaas beleg', 'Cereals en muesli', 'Poeders', 'Halal beleg'];
+    case 'Snoep, koek en chocolade':
+      return ['Chocolade', 'Koeken', 'Drop', 'Snoepjes', 'Pepermunt en kauwgom', 'Zoete snacks', 'Bakken', 'Uitdeelzakken', 'Fruitbiscuit'];
+    case 'Chips, popcorn en noten':
+      return ['Chips', 'Noten', 'Popcorn', 'Zoutjes', 'Toastjes'];
+    case 'Tussendoortjes':
+      return ['Mueslirepen', 'Fruitsnacks', 'Notenrepen', 'Fruitrepen', 'Eiwitrepen', 'Ontbuitkoekrepen', 'Rijstwafels', 'Drinkboillon', 'Knackebrod'];
+    case 'Frisdrank en sappen':
+      return ['Frisdrank', 'Water', 'Sap', 'Energie drink', 'Smooties', 'Siroop en limonade', 'Water met smaak', 'Ice tea', 'Drinkpakjes'];
+    case 'Koffie en thee':
+      return ['Koffie', 'Thee'];
+    case 'Bier, wijn en aperitieven':
+      return ['Bier', 'Wijn', 'Sterke drank', 'Speciaalbier', 'Alcoholvrij bier', 'Aperitieven en mixdranken'];
+    case 'Pasta, rijst en wereldkeuken':
+      return ['Pasta', 'Rijst', 'Noedels en mie', 'Speciale voeding', 'Olie en azijn', 'Indonesisch', 'Italiaans en mediteriaans', 'Oosterse keuken', 'Maaltijdpakketten en mixen', 'Mexicaans', 'Hollandse keuken'];
+    case 'Soepen, sauzen, kruiden en olie':
+      return ['Soepen', 'Sauzen', 'Kruiden', 'Conserven', 'Smaakmakers', 'Garnering'];
+    case 'Sport en dieetvoeding':
+      return ['Supplementen en vitamines', 'Sportvoeding', 'Proteine poeder', 'Eiwitshakes', 'Dieetvoeding', 'Optiek', 'Zelfzorg'];
+    case 'Diepvries':
+      return ['IJs', 'Diepvries pizza', 'Diepvries snacks', 'Diepvries aardappel', 'Diepvries vis en vlees', 'Diepvries gebak en bladerdeeg', 'Diepvries kant en klare maaltijden', 'Diepvries glutenvrij', 'Diepvries babyvoeding'];
+    case 'Drogisterij':
+      return ['Lichaamsverzorging', 'Mondverzorging', 'Pijnstillers', 'Haarverzorging', 'Make up', 'Maandverband en tampons', 'Intimiteit'];
+    case 'Baby en kind':
+      return ['Luiers en doekjes', 'Babyvoeding', 'Baby en kind verzorging', 'Zwangerschap', 'Baby gezondheid'];
+    case 'Huishouden':
+      return ['Schoonmaakmiddelen', 'Wasmiddel en wasverzachters', 'Luchtverfrissers', 'Vaatwas en afwasmiddelen', 'Schoonmaak producten', 'Vuilniszakken en folies', 'Toiletpapier', 'Tissues en keukenpapier'];
+    case 'Huisdier':
+      return ['Honden', 'Katten', 'Vissen', 'Knaagdieren', 'Vogels'];
+    case 'Koken, tafelen en vrije tijd':
+      return ['Koken en bakken'];
+    default:
+      return [];
+  }
+}
 
 // Fuse.js options for fuzzy matching
 const fuseOptions = {
   includeScore: true,
-  threshold: 0.4,
+  threshold: 0.6,
+  minMatchCharLength: 2,
   keys: ['saleItem.productName']
 };
 
@@ -70,7 +136,7 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   const [recommendations, setRecommendations] = useState<GroupedRecommendations>({});
   const [isLoading, setIsLoading] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [lastProcessedIds, setLastProcessedIds] = useState<Set<string>>(new Set());
+  const [lastProcessedIds] = useState<Set<string>>(new Set());
   const [switchingItems, setSwitchingItems] = useState<Set<string>>(new Set());
   const [switchedItems, setSwitchedItems] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,14 +144,31 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   const [isSearching, setIsSearching] = useState(false);
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
   const [, setHasSeenWelcome] = useState(false);
+  const [isAddingItem, setIsAddingItem] = useState<Set<string>>(new Set());
+  const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
+
+  // Add debounced search function
+  const [debouncedSearch] = useState(() => {
+    let timeout: NodeJS.Timeout;
+    return (query: string) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        if (query.trim()) {
+          handleSearch(query);
+        } else {
+          setSearchResults([]);
+        }
+      }, 500); // Wait 500ms after user stops typing
+    };
+  });
 
   const filterRecommendationsByFuzzyMatch = (groceryItemName: string, recommendations: Array<any>) => {
     const fuse = new Fuse(recommendations, fuseOptions);
     const results = fuse.search(groceryItemName);
     
-    // Only keep matches with a reasonable score (lower is better)
+    // Keep matches with a more lenient score threshold
     return results
-      .filter(result => result.score && result.score < 0.6)
+      .filter(result => result.score && result.score < 0.8)
       .map(result => result.item);
   };
 
@@ -101,109 +184,55 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
 
       setIsLoading(true);
       try {
-        // Get current active item IDs
-        const currentIds = new Set(activeItems.map(item => item.id));
-        const newItems = activeItems.filter(item => !lastProcessedIds.has(item.id));
-        
-        // If there are no new items and we have recommendations, use existing ones
-        if (newItems.length === 0 && Object.keys(recommendations).length > 0) {
-          // Filter out recommendations for items no longer in the list
-          const filteredRecs = Object.entries(recommendations).reduce((acc, [key, value]) => {
-            if (currentIds.has(key)) {
-              acc[key] = value;
-            }
-            return acc;
-          }, {} as GroupedRecommendations);
+        // Always generate new recommendations for all items
+        const newRecs = await hybridSearchService.searchSaleItems(activeItems);
+            
+        // Group new recommendations with fuzzy matching
+        const groupedRecs: GroupedRecommendations = {};
+        newRecs.forEach(rec => {
+          const key = rec.groceryItem.id;
           
-          setRecommendations(filteredRecs);
-          setIsLoading(false);
-          return;
-        }
+          // Apply fuzzy matching to filter recommendations
+          const filteredRecommendations = filterRecommendationsByFuzzyMatch(
+            rec.groceryItem.name,
+            rec.recommendations
+          );
 
-        // Try to get cached recommendations first
-        const { data: cachedData } = await supabase
-          .from('sale_recommendations')
-          .select('*')
-          .in('grocery_item_id', activeItems.map(item => item.id));
+          if (filteredRecommendations.length > 0) {
+            groupedRecs[key] = {
+              groceryItem: rec.groceryItem,
+              recommendations: filteredRecommendations
+            };
 
-        let groupedRecs: GroupedRecommendations = {};
-
-        // Process cached recommendations with fuzzy matching
-        if (cachedData && cachedData.length > 0) {
-          const cachedMap = new Map(cachedData.map(item => [item.grocery_item_id, item]));
-          
-          for (const item of activeItems) {
-            const cached = cachedMap.get(item.id);
-            if (cached && cached.recommendations.length > 0) {
-              // Apply fuzzy matching to cached recommendations
-              const filteredRecommendations = filterRecommendationsByFuzzyMatch(
-                item.name,
-                cached.recommendations
-              );
-
-              if (filteredRecommendations.length > 0) {
-                groupedRecs[item.id] = {
-                  groceryItem: item,
-                  recommendations: filteredRecommendations
-                };
-              }
-            }
+            // Cache recommendations
+            supabase
+              .from('sale_recommendations')
+              .upsert({
+                grocery_item_id: key,
+                recommendations: filteredRecommendations.map(r => ({
+                  ...r,
+                  saleItem: {
+                    ...r.saleItem,
+                    supermarkets: r.saleItem.supermarkets?.map((store: SupermarketStore) => ({
+                      ...store,
+                      supermarket_data: store.supermarket_data || {
+                        name: store.name,
+                        price: `€ ${store.currentPrice}`,
+                        offerText: store.offerText || `${store.savingsPercentage}% korting`,
+                        offerEndDate: store.validUntil
+                      }
+                    }))
+                  }
+                })),
+                created_at: new Date().toISOString()
+              })
+              .then(({ error }) => {
+                if (error) console.error('Error caching recommendations:', error);
+              });
           }
-        }
-
-        // Generate new recommendations only for items not in cache
-        const itemsNeedingRecs = activeItems.filter(item => !groupedRecs[item.id]);
-        if (itemsNeedingRecs.length > 0) {
-          // Use hybrid search for recommendations
-          const newRecs = await hybridSearchService.searchSaleItems(itemsNeedingRecs);
-            
-          // Group new recommendations with fuzzy matching
-          newRecs.forEach(rec => {
-            const key = rec.groceryItem.id;
-            
-            // Apply fuzzy matching to filter recommendations
-            const filteredRecommendations = filterRecommendationsByFuzzyMatch(
-              rec.groceryItem.name,
-              rec.recommendations
-            );
-
-            if (filteredRecommendations.length > 0) {
-              groupedRecs[key] = {
-                groceryItem: rec.groceryItem,
-                recommendations: filteredRecommendations
-              };
-
-              // Cache recommendations
-              supabase
-                .from('sale_recommendations')
-                .upsert({
-                  grocery_item_id: key,
-                  recommendations: filteredRecommendations.map(r => ({
-                    ...r,
-                    saleItem: {
-                      ...r.saleItem,
-                      supermarkets: r.saleItem.supermarkets?.map((store: SupermarketStore) => ({
-                        ...store,
-                        supermarket_data: store.supermarket_data || {
-                          name: store.name,
-                          price: `€ ${store.currentPrice}`,
-                          offerText: store.offerText || `${store.savingsPercentage}% korting`,
-                          offerEndDate: store.validUntil
-                        }
-                      }))
-                    }
-                  })),
-                  created_at: new Date().toISOString()
-                })
-                .then(({ error }) => {
-                  if (error) console.error('Error caching recommendations:', error);
-                });
-            }
-          });
-        }
+        });
 
         setRecommendations(groupedRecs);
-        setLastProcessedIds(currentIds);
         
         // Only expand the first product that has recommendations
         const firstItemWithRecs = Object.keys(groupedRecs)[0];
@@ -218,7 +247,7 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
     };
 
     loadRecommendations();
-  }, [groceryList]);
+  }, [groceryList]); // Only depend on groceryList to trigger refresh
 
   useEffect(() => {
     // Check if user has seen the welcome message
@@ -311,7 +340,133 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
     }
   };
 
-    return (
+  async function handleAddToGroceryList(saleItem: SaleItem, store: SupermarketStore) {
+    const itemKey = `search-${saleItem.id}-${store.name}`;
+    
+    if (isAddingItem.has(itemKey)) return;
+
+    try {
+      setIsAddingItem(prev => new Set([...prev, itemKey]));
+
+      let mainCategory: Category = 'Overig';
+      let subcategory = '';
+      let emoji = '🛍️';
+
+      try {
+        // Step 1: First determine the main category
+        const mainCategoryPrompt = `Given the Dutch grocery item name "${saleItem.productName}", determine which main category it belongs to. Only return the category name, nothing else.
+        Available categories:
+        ${CATEGORIES.map(cat => `- ${cat}`).join('\n')}
+
+        Only respond with the category name, nothing else.`;
+
+        const mainCategoryResult = await model.generateContent(mainCategoryPrompt);
+        const suggestedCategory = mainCategoryResult.response.text().trim();
+        
+        // Validate the category
+        if (CATEGORIES.includes(suggestedCategory as Category)) {
+          mainCategory = suggestedCategory as Category;
+
+          // Step 2: Then determine the subcategory and emoji
+          const subcategoryPrompt = `Given this grocery item: "${saleItem.productName}" and its main category "${mainCategory}", 
+choose the most appropriate subcategory from the following list. Only respond with the subcategory name, nothing else.
+
+${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
+
+          const subcategoryResult = await model.generateContent(subcategoryPrompt);
+          const subCategory = subcategoryResult.response.text().trim();
+
+          // Validate subcategory
+          const typedSubCategories = getSubcategoriesForMainCategory(mainCategory);
+          const isValidSubCategory = typedSubCategories.includes(subCategory);
+          
+          if (isValidSubCategory) {
+            subcategory = subCategory;
+          } else {
+            console.warn(`Unexpected subcategory returned by AI: ${subCategory}`);
+            subcategory = typedSubCategories[0] || ''; // Use first subcategory as fallback
+          }
+
+          // Step 3: Get an appropriate emoji
+          const emojiPrompt = `Given this grocery item: "${saleItem.productName}" in category "${mainCategory}" and subcategory "${subcategory}", suggest a single appropriate emoji. Only respond with the emoji, nothing else.`;
+
+          const emojiResult = await model.generateContent(emojiPrompt);
+          emoji = emojiResult.response.text().trim();
+        }
+      } catch (aiError) {
+        console.error('Error getting AI categorization:', aiError);
+        // Keep default values if AI fails
+      }
+
+      // Parse the valid_until date if it exists
+      let validUntil = null;
+      if (store.validUntil) {
+        try {
+          // Check if it's a Dutch format like "t/m 04-02"
+          if (store.validUntil.includes('t/m')) {
+            const datePart = store.validUntil.split('t/m')[1].trim();
+            const [day, month] = datePart.split('-').map(num => num.padStart(2, '0'));
+            const year = new Date().getFullYear();
+            validUntil = new Date(year, parseInt(month) - 1, parseInt(day)).toISOString();
+          } else {
+            // Try to parse as a regular date string
+            validUntil = new Date(store.validUntil).toISOString();
+          }
+        } catch (error) {
+          console.error('Error parsing valid_until date:', error);
+          validUntil = null;
+        }
+      }
+
+      // Create a new grocery item
+      const newGroceryItem = {
+        name: saleItem.productName,
+        emoji: emoji,
+        household_id: groceryList[0]?.household_id,
+        completed: false,
+        priority: false,
+        product_id: saleItem.id,
+        current_price: store.currentPrice,
+        original_price: store.originalPrice,
+        sale_type: store.saleType,
+        valid_until: validUntil,
+        supermarket: store.name,
+        category: mainCategory,
+        subcategory: subcategory,
+        quantity: '1',
+        unit: 'st'
+      };
+
+      await groceryService.addGroceryItem(newGroceryItem);
+
+      // Show success state
+      setIsAddingItem(prev => {
+        const next = new Set(prev);
+        next.delete(itemKey);
+        return next;
+      });
+      setAddedItems(prev => new Set([...prev, itemKey]));
+
+      // Clear after a delay
+      setTimeout(() => {
+        setAddedItems(prev => {
+          const next = new Set(prev);
+          next.delete(itemKey);
+          return next;
+        });
+      }, 2000);
+
+    } catch (error) {
+      console.error('Error adding item to grocery list:', error);
+      setIsAddingItem(prev => {
+        const next = new Set(prev);
+        next.delete(itemKey);
+        return next;
+      });
+    }
+  }
+
+  return (
     <div className="w-full max-w-md mx-auto px-4">
       <AnimatePresence>
         {showWelcomePopup && (
@@ -397,7 +552,7 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
-                  handleSearch(e.target.value);
+                  debouncedSearch(e.target.value);
                 }}
                 placeholder="Zoek in alle aanbiedingen..."
                 className="w-full pl-12 pr-12 py-3.5 bg-white/80 hover:bg-white/90 focus:bg-white backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-sm text-[15px] text-gray-900 placeholder-gray-500 outline-none ring-0 focus:ring-2 ring-offset-0 ring-blue-500/20 transition-all duration-300"
@@ -484,50 +639,21 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
                                 </div>
                                 
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Create a temporary grocery item for the search result
-                                    const searchGroceryItem: GroceryItem = {
-                                      id: 'search-' + Date.now(),
-                                      name: searchQuery,
-                                      emoji: '🔍',
-                                      completed: false,
-                                      category: 'Overig',
-                                      subcategory: '',
-                                      quantity: '',
-                                      priority: false,
-                                      household_id: '',
-                                      user_id: '',
-                                      user_name: '',
-                                      user_avatar: '',
-                                      created_at: new Date().toISOString(),
-                                      updated_at: '',
-                                      supermarket: '',
-                                      unit: '',
-                                      current_price: '',
-                                      original_price: '',
-                                      sale_type: '',
-                                      valid_until: '',
-                                      image_url: '',
-                                      is_deleted: false,
-                                      product_url: '',
-                                      product_id: '',
-                                      stores: []
-                                    };
-                                    handleSwitch(searchGroceryItem, result.saleItem, store);
-                                  }}
-                                  disabled={switchingItems.has(`search-${result.saleItem.id}-${store.name}`)}
+                                  onClick={() => handleAddToGroceryList(result.saleItem, store)}
+                                  disabled={isAddingItem.has(`search-${result.saleItem.id}-${store.name}`)}
                                   className={cn(
                                     "group relative flex h-6 px-2 items-center justify-center rounded-md text-[11px] font-medium transition-all duration-200",
-                                    switchedItems.has(`search-${result.saleItem.id}-${store.name}`)
+                                    isAddingItem.has(`search-${result.saleItem.id}-${store.name}`)
+                                      ? "bg-gray-100 text-gray-400"
+                                      : addedItems.has(`search-${result.saleItem.id}-${store.name}`)
                                       ? "bg-green-100 hover:bg-green-200 text-green-700"
                                       : "bg-blue-50 hover:bg-blue-100 text-blue-700"
                                   )}
                                 >
                                   <AnimatePresence mode="wait">
-                                    {switchingItems.has(`search-${result.saleItem.id}-${store.name}`) ? (
+                                    {isAddingItem.has(`search-${result.saleItem.id}-${store.name}`) ? (
                                       <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : switchedItems.has(`search-${result.saleItem.id}-${store.name}`) ? (
+                                    ) : addedItems.has(`search-${result.saleItem.id}-${store.name}`) ? (
                                       <motion.div
                                         initial={{ scale: 0 }}
                                         animate={{ scale: 1 }}
@@ -535,7 +661,7 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
                                         className="flex items-center gap-1"
                                       >
                                         <Check className="h-3 w-3" />
-                                        <span>OK</span>
+                                        <span>Toegevoegd</span>
                                       </motion.div>
                                     ) : (
                                       <motion.div
@@ -544,8 +670,8 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
                                         exit={{ scale: 0 }}
                                         className="flex items-center gap-1"
                                       >
-                                        <ArrowRightLeft className="h-3 w-3" />
-                                        <span>Wissel</span>
+                                        <Plus className="h-3 w-3" />
+                                        <span>Toevoegen</span>
                                       </motion.div>
                                     )}
                                   </AnimatePresence>
