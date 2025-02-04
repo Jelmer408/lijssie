@@ -45,6 +45,11 @@ interface Product {
 
 async function upsertProduct(product: Product) {
   try {
+    if (!product.itemUrl) {
+      console.error('Product URL is missing:', product.name);
+      return;
+    }
+
     // First, check if product exists by URL
     const { data: existingProducts, error: fetchError } = await supabase
       .from('products')
@@ -57,6 +62,7 @@ async function upsertProduct(product: Product) {
       return;
     }
 
+    const now = new Date().toISOString();
     const productData = {
       title: product.name,
       image_url: product.imageUrl,
@@ -64,40 +70,49 @@ async function upsertProduct(product: Product) {
       category: product.category,
       subcategory: product.subcategory,
       main_category: product.mainCategory,
-      supermarket_data: product.supermarkets,
-      last_updated: new Date().toISOString(),
-      url: product.itemUrl
+      supermarket_data: product.supermarkets, // Supabase automatically handles JSON conversion
+      last_updated: now,
+      url: product.itemUrl,
+      updated_at: now
     };
 
-    if (existingProducts && existingProducts.length > 0) {
-      // Update existing product
-      const { error: updateError } = await supabase
-        .from('products')
-        .update(productData)
-        .eq('id', existingProducts[0].id);
+    try {
+      if (existingProducts && existingProducts.length > 0) {
+        // Update existing product
+        const { error: updateError } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', existingProducts[0].id)
+          .select();
 
-      if (updateError) {
-        console.error('Error updating product:', updateError);
-        console.error('Failed product data:', JSON.stringify(product, null, 2));
+        if (updateError) {
+          console.error('Error updating product:', updateError);
+          console.error('Failed product data:', JSON.stringify(productData, null, 2));
+        } else {
+          console.log(`Updated product: ${product.name} (${existingProducts[0].id})`);
+        }
       } else {
-        console.log(`Updated product: ${product.name}`);
-      }
-    } else {
-      // Insert new product
-      const id = Math.floor(Math.random() * 1000000000000).toString();
-      const { error: insertError } = await supabase
-        .from('products')
-        .insert({
-          id,
-          ...productData
-        });
+        // Insert new product
+        const id = Math.floor(Math.random() * 1000000000000).toString();
+        const { error: insertError } = await supabase
+          .from('products')
+          .insert({
+            id,
+            ...productData,
+            created_at: now
+          })
+          .select();
 
-      if (insertError) {
-        console.error('Error inserting product:', insertError);
-        console.error('Failed product data:', JSON.stringify(product, null, 2));
-      } else {
-        console.log(`Inserted new product: ${product.name}`);
+        if (insertError) {
+          console.error('Error inserting product:', insertError);
+          console.error('Failed product data:', JSON.stringify({ id, ...productData }, null, 2));
+        } else {
+          console.log(`Inserted new product: ${product.name} (${id})`);
+        }
       }
+    } catch (dbError) {
+      console.error('Database operation failed:', dbError);
+      console.error('Operation data:', JSON.stringify(productData, null, 2));
     }
   } catch (error) {
     console.error(`Failed to upsert product ${product.name}:`, error);
