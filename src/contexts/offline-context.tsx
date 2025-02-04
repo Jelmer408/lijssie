@@ -66,10 +66,16 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
         try {
           switch (change.type) {
             case 'add':
-              await groceryService.addItem(change.item, household.id);
+              await groceryService.addItem({
+                ...change.item,
+                emoji: change.item.emoji || '📦'
+              }, household.id);
               break;
             case 'update':
-              await groceryService.updateItem(change.item.id, change.item);
+              await groceryService.updateItem(change.item.id, {
+                ...change.item,
+                emoji: change.item.emoji || '📦'
+              });
               break;
             case 'delete':
               await groceryService.deleteItem(change.item.id);

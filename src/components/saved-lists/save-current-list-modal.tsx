@@ -80,8 +80,9 @@ export function SaveCurrentListModal({ isOpen, onClose, items, householdId }: Sa
           name: item.name,
           category: item.category,
           quantity: item.quantity || '1',
-          emoji: item.emoji,
-          priority: Boolean(item.priority)
+          emoji: item.emoji || '📦',
+          priority: Boolean(item.priority),
+          product_id: item.product_id || null
         })),
         household_id: householdId,
         user_id: user.id
