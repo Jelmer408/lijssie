@@ -11,10 +11,10 @@ jobs:
     outputs:
       total_chunks: '40'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           
@@ -28,7 +28,7 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           
       - name: Upload category chunks
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: category-chunks
           path: category-chunks/
@@ -43,10 +43,10 @@ jobs:
       fail-fast: false  # Continue with other jobs if one fails
       
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           
@@ -54,7 +54,7 @@ jobs:
         run: npm install
         
       - name: Download category chunks
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: category-chunks
           path: category-chunks
@@ -67,7 +67,7 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           
       - name: Upload scraping results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: scraping-results-${{ matrix.chunk_index }}
           path: scraping-results/
