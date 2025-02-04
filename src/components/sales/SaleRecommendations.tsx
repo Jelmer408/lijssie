@@ -136,7 +136,7 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   const [recommendations, setRecommendations] = useState<GroupedRecommendations>({});
   const [isLoading, setIsLoading] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [lastProcessedIds] = useState<Set<string>>(new Set());
+  const [] = useState<Set<string>>(new Set());
   const [switchingItems, setSwitchingItems] = useState<Set<string>>(new Set());
   const [switchedItems, setSwitchedItems] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');

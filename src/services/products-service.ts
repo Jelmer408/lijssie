@@ -1,5 +1,31 @@
 import { supabase } from '@/lib/supabase';
 
+interface SupermarketData {
+  name: string;
+  logoUrl: string;
+  price: string;
+  pricePerUnit: string;
+  offerText?: string;
+  offerEndDate?: string;
+}
+
+interface StoreWithOffer {
+  name: string;
+  currentPrice: string;
+  originalPrice: string;
+  saleType?: string;
+  validUntil?: string;
+  savingsPercentage: number;
+  supermarket_data: {
+    name: string;
+    price: string;
+    offerText?: string;
+    offerEndDate?: string;
+    pricePerUnit: string;
+  };
+  isRegularPrice?: boolean;
+}
+
 interface Product {
   id: string;
   title: string;
@@ -8,14 +34,7 @@ interface Product {
   category: string;
   subcategory: string;
   main_category: string;
-  supermarket_data: Array<{
-    name: string;
-    logoUrl: string;
-    price: string;
-    pricePerUnit: string;
-    offerText?: string;
-    offerEndDate?: string;
-  }>;
+  supermarket_data: SupermarketData[];
   last_updated: string;
   url: string;
   created_at: string;
@@ -45,22 +64,6 @@ interface ProductWithSavings extends Product {
   validUntil?: string;
 }
 
-interface SupermarketStore {
-  name: string;
-  currentPrice: string;
-  originalPrice?: string;
-  saleType?: string;
-  validUntil?: string;
-  savingsPercentage: number;
-  isRegularPrice?: boolean;
-  supermarket_data: {
-    name: string;
-    price: string;
-    offerText?: string;
-    offerEndDate?: string;
-    pricePerUnit: string;
-  };
-}
 
 class ProductsService {
   async getProducts(category?: string): Promise<Product[]> {
@@ -137,8 +140,8 @@ class ProductsService {
 
         // Find supermarkets with offers
         const storesWithOffers = product.supermarket_data
-          .filter(store => store.offerText)
-          .map(store => {
+          .filter((store: SupermarketData) => store.offerText)
+          .map((store: SupermarketData) => {
             const currentPrice = store.price.replace('€', '').replace(',', '.').trim();
             const originalPrice = store.pricePerUnit.replace('€', '').replace(',', '.').replace('/stuk', '').trim();
 
@@ -166,13 +169,13 @@ class ProductsService {
               }
             };
           })
-          .filter((store): store is NonNullable<typeof store> => store !== null);
+          .filter((store: StoreWithOffer | null): store is StoreWithOffer => store !== null);
 
         if (storesWithOffers.length === 0) return;
 
         // Get the best savings percentage across all stores
-        const bestSavings = Math.max(...storesWithOffers.map(store => store.savingsPercentage));
-        const bestStore = storesWithOffers.find(store => store.savingsPercentage === bestSavings)!;
+        const bestSavings = Math.max(...storesWithOffers.map((store: StoreWithOffer) => store.savingsPercentage));
+        const bestStore = storesWithOffers.find((store: StoreWithOffer) => store.savingsPercentage === bestSavings)!;
 
         if (productsMap.has(product.id)) {
           // Add stores to existing product
@@ -241,8 +244,8 @@ class ProductsService {
 
         // First, process all stores to get their prices
         const allStores = product.supermarket_data
-          .filter(store => store.price)
-          .map(store => {
+          .filter((store: SupermarketData) => store.price)
+          .map((store: SupermarketData) => {
             const currentPrice = this.parsePrice(store.price);
             const originalPrice = this.parsePrice(store.pricePerUnit);
             
@@ -271,35 +274,34 @@ class ProductsService {
               }
             };
           })
-          .filter((store): store is NonNullable<typeof store> => store !== null);
+          .filter((store: StoreWithOffer | null): store is StoreWithOffer => store !== null);
 
         if (allStores.length === 0) return;
 
         // Find the lowest price among all stores
-        const lowestPrice = Math.min(...allStores.map(store => parseFloat(store.currentPrice)));
+        const lowestPrice = Math.min(...allStores.map((store: StoreWithOffer) => parseFloat(store.currentPrice)));
 
         // Filter stores to include:
         // 1. Stores with active sales (offerText)
         // 2. Stores with regular prices equal to or lower than the lowest sale price
-        const relevantStores = allStores.filter(store => {
+        const relevantStores = allStores.filter((store: StoreWithOffer) => {
           const price = parseFloat(store.currentPrice);
           const isCheaperRegularPrice = !store.saleType && price <= lowestPrice;
           return store.saleType || isCheaperRegularPrice;
-        }).map(store => ({
+        }).map((store: StoreWithOffer) => ({
           ...store,
-          // Mark as regular price if it's not a sale but is one of the cheapest options
           isRegularPrice: !store.saleType
         }));
 
         if (relevantStores.length === 0) return;
 
         // Get the best savings percentage across stores with sales
-        const storesWithSales = relevantStores.filter(store => store.saleType);
+        const storesWithSales = relevantStores.filter((store: StoreWithOffer) => store.saleType);
         const bestSavings = storesWithSales.length > 0
-          ? Math.max(...storesWithSales.map(store => store.savingsPercentage))
+          ? Math.max(...storesWithSales.map((store: StoreWithOffer) => store.savingsPercentage))
           : 0;
         const bestStore = storesWithSales.length > 0
-          ? storesWithSales.find(store => store.savingsPercentage === bestSavings)!
+          ? storesWithSales.find((store: StoreWithOffer) => store.savingsPercentage === bestSavings)!
           : relevantStores[0];
 
         if (productsMap.has(product.id)) {

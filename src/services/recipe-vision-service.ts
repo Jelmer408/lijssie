@@ -1,7 +1,7 @@
 import { aiService } from './ai-service';
 import type { RecipeIngredient } from '@/types/recipe';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { CATEGORIES, Category, categoryEmojis } from '@/constants/categories';
+import { CATEGORIES, Category } from '@/constants/categories';
 
 // Add interface for receipt data
 interface ReceiptItem {
