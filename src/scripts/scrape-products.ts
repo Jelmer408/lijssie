@@ -43,19 +43,6 @@ interface Product {
   itemUrl?: string;
 }
 
-interface ProductRecord {
-  id: string;
-  title: string;
-  image_url: string;
-  quantity_info: string;
-  category: string;
-  subcategory: string;
-  main_category: string;
-  supermarket_data: Supermarket[];
-  last_updated: string;
-  url: string;
-}
-
 async function deleteAllProducts() {
   // Only delete products in the first chunk to avoid conflicts
   if (chunkIndex === 0) {
