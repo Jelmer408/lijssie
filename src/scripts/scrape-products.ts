@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import fs from "fs"
 import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
   throw new Error('Missing Supabase environment variables');
@@ -56,9 +57,9 @@ async function upsertProduct(product: Product) {
       return;
     }
 
-    // First, check if product exists by URL - EXPLICIT SCHEMA AND TABLE
+    // First, check if product exists by URL
     const { data: existingProducts, error: fetchError } = await supabase
-      .from('public.products')
+      .from('products')
       .select('id')
       .eq('url', product.itemUrl)
       .limit(1);
@@ -71,9 +72,9 @@ async function upsertProduct(product: Product) {
     const now = new Date().toISOString();
 
     if (existingProducts && existingProducts.length > 0) {
-      // EXPLICIT UPDATE WITH RAW SQL
+      // Update existing product
       const { error: updateError } = await supabase
-        .from('public.products')
+        .from('products')
         .update({
           title: product.name,
           image_url: product.imageUrl,
@@ -94,10 +95,10 @@ async function upsertProduct(product: Product) {
         console.log(`Updated product in products table: ${product.name} (${existingProducts[0].id})`);
       }
     } else {
-      // EXPLICIT INSERT WITH RAW SQL
-      const id = Math.floor(Math.random() * 1000000000000).toString();
+      // Insert new product with UUID
+      const id = uuidv4(); // Generate proper UUID
       const { error: insertError } = await supabase
-        .from('public.products')
+        .from('products')
         .insert([{
           id,
           title: product.name,
