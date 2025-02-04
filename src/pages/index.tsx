@@ -1083,11 +1083,39 @@ const MainPage = () => {
     }
   }, [selectedItem]);
 
-  // Add this new function after the other helper functions and before renderMainContent
+  // Helper functions
+  const getCombinations = (arr: string[], n: number): string[][] => {
+    if (n === 1) return arr.map(val => [val]);
+    
+    const combinations: string[][] = [];
+    
+    arr.forEach((val, idx) => {
+      const remaining = arr.slice(idx + 1);
+      const subCombinations = getCombinations(remaining, n - 1);
+      subCombinations.forEach(subComb => {
+        combinations.push([val, ...subComb]);
+      });
+    });
+    
+    return combinations;
+  };
+
+  const getStorePrice = (store: StorePrice): number => Number(store.price);
+
+  const isStoreInOptimal = (store: StorePrice, optimalStoreNames: string[]): boolean => {
+    return optimalStoreNames.some(optimalStore => 
+      normalizeStoreName(store.name) === normalizeStoreName(optimalStore)
+    );
+  };
+
+  // Update getProductsForStore to filter out completed items
   const getProductsForStore = useCallback((store: string | null): GroceryItem[] => {
-    if (!store || !optimalStores) return products;
+    if (!store || !optimalStores) return products.filter(product => !product.completed);
 
     return products.filter(product => {
+      // Skip completed items
+      if (product.completed) return false;
+
       // Include products without store information (generic items)
       if (!product.stores || product.stores.length === 0) {
         return true;
@@ -1112,15 +1140,15 @@ const MainPage = () => {
     });
   }, [products, optimalStores, normalizeStoreName]);
 
-  // Modify the useEffect for grouping products to use the filtered products
+  // Update the useEffect for grouping products
   useEffect(() => {
     if (!products) return;
 
-    const filteredProducts = getProductsForStore(currentStore);
-    // Filter out completed items from the normal grocery list
-    const activeProducts = filteredProducts.filter(product => !product.completed);
+    const filteredProducts = currentStore 
+      ? getProductsForStore(currentStore)
+      : products.filter(product => !product.completed);
     
-    const grouped = activeProducts.reduce((acc, product) => {
+    const grouped = filteredProducts.reduce((acc, product) => {
       const category = product.category || 'Uncategorized';
       if (!acc[category]) {
         acc[category] = [];
@@ -1344,31 +1372,6 @@ const MainPage = () => {
     loadHouseholdSettings();
   }, [householdId]);
 
-  // Helper functions
-  const getCombinations = (arr: string[], n: number): string[][] => {
-    if (n === 1) return arr.map(val => [val]);
-    
-    const combinations: string[][] = [];
-    
-    arr.forEach((val, idx) => {
-      const remaining = arr.slice(idx + 1);
-      const subCombinations = getCombinations(remaining, n - 1);
-      subCombinations.forEach(subComb => {
-        combinations.push([val, ...subComb]);
-      });
-    });
-    
-    return combinations;
-  };
-
-  const getStorePrice = (store: StorePrice): number => Number(store.price);
-
-  const isStoreInOptimal = (store: StorePrice, optimalStoreNames: string[]): boolean => {
-    return optimalStoreNames.some(optimalStore => 
-      normalizeStoreName(store.name) === normalizeStoreName(optimalStore)
-    );
-  };
-
   // Update the mapping function for saved lists to include product_id
   const mapItemsForSavedList = (items: GroceryItem[]) => {
     return items.map(item => ({
@@ -1420,54 +1423,58 @@ const MainPage = () => {
                 storeProductCounts={storeProductCounts}
               />
             )}
-            {categories.map((category: string) => (
-              <motion.div
-                key={category}
-                className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100/20 shadow-lg overflow-hidden"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                layout
-              >
-                <motion.div 
-                  className="py-2 px-4 flex items-center justify-between border-b border-gray-100 bg-gray-50/50"
+            {categories
+              .filter(category => groupedProducts[category].filter(item => !item.completed).length > 0)
+              .map((category: string) => (
+                <motion.div
+                  key={category}
+                  className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100/20 shadow-lg overflow-hidden"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
                   layout
                 >
-                  <div className="flex items-center gap-2">
-                    {isReorderMode && (
-                      <GripVertical className="h-4 w-4 text-gray-400" />
-                    )}
-                    <motion.h2 layout className="text-base font-semibold text-gray-700">
-                      {category}
-                    </motion.h2>
-                  </div>
-                  <motion.span layout className="text-sm text-gray-500">
-                    {groupedProducts[category].length} items
-                  </motion.span>
+                  <motion.div 
+                    className="py-2 px-4 flex items-center justify-between border-b border-gray-100 bg-gray-50/50"
+                    layout
+                  >
+                    <div className="flex items-center gap-2">
+                      {isReorderMode && (
+                        <GripVertical className="h-4 w-4 text-gray-400" />
+                      )}
+                      <motion.h2 layout className="text-base font-semibold text-gray-700">
+                        {category}
+                      </motion.h2>
+                    </div>
+                    <motion.span layout className="text-sm text-gray-500">
+                      {groupedProducts[category].filter(item => !item.completed).length} items
+                    </motion.span>
+                  </motion.div>
+                  <motion.ul 
+                    className="divide-y divide-gray-100"
+                    layout
+                  >
+                    <AnimatePresence mode="popLayout">
+                      {groupedProducts[category]
+                        .filter(item => !item.completed)
+                        .map((product) => (
+                          <SwipeableProductCard
+                            key={product.id}
+                            product={product}
+                            onRemove={handleRemove}
+                            onToggle={handleToggle}
+                            expandedItem={expandedItem}
+                            onExpand={setExpandedItem}
+                            showPriceFeatures={showPriceFeatures}
+                            selectedStores={selectedStores}
+                            maxStores={maxStores}
+                            currentStore={currentStore}
+                            onOpenProductDrawer={handleOpenProductDrawer}
+                          />
+                      ))}
+                    </AnimatePresence>
+                  </motion.ul>
                 </motion.div>
-                <motion.ul 
-                  className="divide-y divide-gray-100"
-                  layout
-                >
-                  <AnimatePresence mode="popLayout">
-                    {groupedProducts[category].map((product) => (
-                      <SwipeableProductCard
-                        key={product.id}
-                        product={product}
-                        onRemove={handleRemove}
-                        onToggle={handleToggle}
-                        expandedItem={expandedItem}
-                        onExpand={setExpandedItem}
-                        showPriceFeatures={showPriceFeatures}
-                        selectedStores={selectedStores}
-                        maxStores={maxStores}
-                        currentStore={currentStore}
-                        onOpenProductDrawer={handleOpenProductDrawer}
-                      />
-                    ))}
-                  </AnimatePresence>
-                </motion.ul>
-              </motion.div>
-            ))}
+              ))}
 
             {/* Completed Items Section */}
             {products.filter(item => {
@@ -1529,7 +1536,7 @@ const MainPage = () => {
                           currentStore={currentStore}
                           onOpenProductDrawer={handleOpenProductDrawer}
                         />
-                      ))}
+                    ))}
                   </AnimatePresence>
                 </motion.ul>
               </motion.div>
