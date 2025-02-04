@@ -43,16 +43,45 @@ interface Product {
   itemUrl?: string;
 }
 
+interface ProductRecord {
+  id: string;
+  title: string;
+  image_url: string;
+  quantity_info: string;
+  category: string;
+  subcategory: string;
+  main_category: string;
+  supermarket_data: Supermarket[];
+  last_updated: string;
+  url: string;
+}
+
 async function deleteAllProducts() {
   // Only delete products in the first chunk to avoid conflicts
   if (chunkIndex === 0) {
     try {
-      const { error } = await supabase
+      // First, delete all grocery items that reference products
+      const { error: groceryItemsError } = await supabase
+        .from('grocery_items')
+        .delete()
+        .neq('id', '0');
+
+      if (groceryItemsError) {
+        console.error('Failed to delete grocery items:', groceryItemsError);
+        throw groceryItemsError;
+      }
+      console.log('Successfully deleted all grocery items');
+
+      // Then delete all products
+      const { error: productsError } = await supabase
         .from('products')
         .delete()
         .neq('id', '0');
 
-      if (error) throw error;
+      if (productsError) {
+        console.error('Failed to delete products:', productsError);
+        throw productsError;
+      }
       console.log('Successfully deleted all products');
     } catch (error) {
       console.error('Failed to delete all products:', error);
@@ -61,32 +90,64 @@ async function deleteAllProducts() {
   }
 }
 
-async function saveProduct(product: Product) {
+async function upsertProduct(product: Product) {
   try {
-    // Generate a random 12-digit numeric ID
-    const id = Math.floor(Math.random() * 1000000000000).toString();
-
-    const { error } = await supabase
+    // First, check if product exists by URL
+    const { data: existingProducts, error: fetchError } = await supabase
       .from('products')
-      .insert({
-        id,
-        title: product.name,
-        image_url: product.imageUrl,
-        quantity_info: product.weight,
-        category: product.category,
-        subcategory: product.subcategory,
-        main_category: product.mainCategory,
-        supermarket_data: product.supermarkets,
-        last_updated: new Date().toISOString(),
-        url: product.itemUrl
-      });
+      .select('id')
+      .eq('url', product.itemUrl)
+      .limit(1);
 
-    if (error) {
-      console.error('Error storing product:', error);
-      console.error('Failed product data:', JSON.stringify(product, null, 2));
+    if (fetchError) {
+      console.error('Error fetching existing product:', fetchError);
+      return;
+    }
+
+    const productData = {
+      title: product.name,
+      image_url: product.imageUrl,
+      quantity_info: product.weight,
+      category: product.category,
+      subcategory: product.subcategory,
+      main_category: product.mainCategory,
+      supermarket_data: product.supermarkets,
+      last_updated: new Date().toISOString(),
+      url: product.itemUrl
+    };
+
+    if (existingProducts && existingProducts.length > 0) {
+      // Update existing product
+      const { error: updateError } = await supabase
+        .from('products')
+        .update(productData)
+        .eq('id', existingProducts[0].id);
+
+      if (updateError) {
+        console.error('Error updating product:', updateError);
+        console.error('Failed product data:', JSON.stringify(product, null, 2));
+      } else {
+        console.log(`Updated product: ${product.name}`);
+      }
+    } else {
+      // Insert new product
+      const id = Math.floor(Math.random() * 1000000000000).toString();
+      const { error: insertError } = await supabase
+        .from('products')
+        .insert({
+          id,
+          ...productData
+        });
+
+      if (insertError) {
+        console.error('Error inserting product:', insertError);
+        console.error('Failed product data:', JSON.stringify(product, null, 2));
+      } else {
+        console.log(`Inserted new product: ${product.name}`);
+      }
     }
   } catch (error) {
-    console.error(`Failed to save product ${product.name}:`, error);
+    console.error(`Failed to upsert product ${product.name}:`, error);
   }
 }
 
@@ -291,7 +352,7 @@ async function scrapeProducts() {
             if (productDetails && productDetails.name) {
               console.log(`Scraped product: ${productDetails.name}, Supermarkets: ${productDetails.supermarkets.length}`);
               pageProducts.push(productDetails);
-              await saveProduct(productDetails);
+              await upsertProduct(productDetails);
               console.log("productDetails-------", productDetails);
             } else {
               console.log(`Skipping product: ${productUrl} - Incomplete data`);
