@@ -6,9 +6,15 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
   throw new Error('Missing Supabase environment variables');
 }
 
+// Create Supabase client with explicit schema
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_KEY,
+  {
+    db: {
+      schema: 'public'
+    }
+  }
 );
 
 // Get chunk information from environment variables
@@ -53,7 +59,7 @@ async function upsertProduct(product: Product) {
     // First, check if product exists by URL
     const { data: existingProducts, error: fetchError } = await supabase
       .from('products')
-      .select('*')
+      .select('id')
       .eq('url', product.itemUrl)
       .limit(1);
 
@@ -70,7 +76,7 @@ async function upsertProduct(product: Product) {
       category: product.category,
       subcategory: product.subcategory,
       main_category: product.mainCategory,
-      supermarket_data: product.supermarkets,
+      supermarket_data: JSON.stringify(product.supermarkets), // Explicitly convert to JSON string
       last_updated: now,
       url: product.itemUrl,
       updated_at: now
@@ -80,7 +86,10 @@ async function upsertProduct(product: Product) {
       // Update existing product in products table
       const { error: updateError } = await supabase
         .from('products')
-        .update(productData)
+        .update({
+          ...productData,
+          supermarket_data: JSON.stringify(product.supermarkets) // Ensure JSON string format
+        })
         .eq('id', existingProducts[0].id);
 
       if (updateError) {
@@ -97,6 +106,7 @@ async function upsertProduct(product: Product) {
         .insert({
           id,
           ...productData,
+          supermarket_data: JSON.stringify(product.supermarkets), // Ensure JSON string format
           created_at: now
         });
 
