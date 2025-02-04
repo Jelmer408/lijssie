@@ -12,6 +12,7 @@ import { GroceryItem } from '@/types/grocery-item'
 import { useAuth } from '@/contexts/auth-context'
 import { savedListsService } from '@/services/saved-lists-service'
 import { receiptVisionService } from '@/services/receipt-vision-service'
+import { Category, isCategory } from '@/constants/categories'
 
 interface ReceiptAnalysisModalProps {
   isOpen: boolean;
@@ -112,10 +113,11 @@ export function ReceiptAnalysisModal({ isOpen, onClose, householdId }: ReceiptAn
         description: description.trim(),
         items: selectedItemsList.map(item => ({
           name: item.name,
-          category: item.category,
-          quantity: item.quantity,
+          category: isCategory(item.category) ? item.category : 'Overig',
+          quantity: item.quantity || '',
           emoji: item.emoji || '🛒',
-          priority: item.priority
+          priority: item.priority || false,
+          product_id: null
         })),
         household_id: householdId,
         user_id: user.id
