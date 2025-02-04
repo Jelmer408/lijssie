@@ -68,6 +68,39 @@ export function AddProductDrawer({
   const [isAddingIngredients, setIsAddingIngredients] = useState(false);
   const [householdSettings, setHouseholdSettings] = useState<HouseholdSettings | null>(null);
 
+  // Store the latest onItemChange in a ref
+  const onItemChangeRef = useRef(onItemChange);
+  useEffect(() => {
+    onItemChangeRef.current = onItemChange;
+  }, [onItemChange]);
+
+  // Reset all states when drawer closes
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset all drawer-related states
+      setIsDropdownOpen(false);
+      setIsProcessingImage(false);
+      setExtractedIngredients([]);
+      setSelectedIngredients(new Set());
+      setIsAddingIngredients(false);
+      
+      // Reset the newItem state to initial values
+      onItemChangeRef.current({
+        name: '',
+        quantity: '',
+        unit: '',
+        category: 'Overig',
+        subcategory: null,
+        priority: false,
+        emoji: '📦',
+        user_id: '',
+        user_name: null,
+        user_avatar: null,
+        household_id: ''
+      });
+    }
+  }, [isOpen]); // Remove onItemChange from dependencies
+
   // Add effect to load household settings
   useEffect(() => {
     async function loadHouseholdSettings() {
@@ -151,7 +184,7 @@ export function AddProductDrawer({
   // Add blur handler for mobile keyboards
   const handleNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value;
-    onItemChange({ 
+    onItemChangeRef.current({ 
       ...newItem, 
       name: newName,
       subcategory: newItem.subcategory ?? null  // Ensure subcategory is always set
@@ -312,7 +345,7 @@ export function AddProductDrawer({
         };
         
         console.log('Updating item with:', updatedItem);
-        onItemChange(updatedItem);
+        onItemChangeRef.current(updatedItem);
 
         console.log('Updated item with AI suggestions:', {
           name: itemName,
@@ -345,7 +378,7 @@ export function AddProductDrawer({
   const fallbackToBasicCategorization = async (itemName: string) => {
     try {
       const aiSuggestion = await aiService.getItemSuggestions(itemName);
-      onItemChange({ 
+      onItemChangeRef.current({ 
         ...newItem,
         name: itemName,
         category: aiSuggestion.category as Category,
@@ -418,27 +451,97 @@ export function AddProductDrawer({
     try {
       for (const ingredient of extractedIngredients) {
         if (selectedIngredients.has(ingredient.id)) {
-          // Get AI suggestions for the ingredient
-          const aiSuggestion = await aiService.getItemSuggestions(ingredient.name);
-          
-          // Create the item with AI suggestions
-          const itemToAdd: CreateGroceryItem = {
-            name: ingredient.name,
-            category: aiSuggestion.category as Category,
-            quantity: ingredient.amount ? `${ingredient.amount} ${ingredient.unit || ''}`.trim() : '1',
-            unit: ingredient.unit || '',
-            priority: false,
-            emoji: aiSuggestion.emoji,
-            subcategory: aiSuggestion.subcategory ?? ingredient.name,
-            completed: false,
-            user_id: '',  // These will be set by the backend
-            user_name: '',
-            user_avatar: '',
-            household_id: ''  // This will be set by the backend
-          };
-          
-          console.log('Adding ingredient with data:', itemToAdd);
-          await onAddItem(itemToAdd);
+          try {
+            // Check for API key
+            if (!GOOGLE_AI_KEY) {
+              console.warn('No Gemini AI key available, falling back to basic categorization');
+              const aiSuggestion = await aiService.getItemSuggestions(ingredient.name);
+              
+              // Create the item with basic AI suggestions
+              const itemToAdd: CreateGroceryItem = {
+                name: ingredient.name,
+                category: aiSuggestion.category as Category,
+                quantity: ingredient.amount ? `${ingredient.amount} ${ingredient.unit || ''}`.trim() : '1',
+                unit: ingredient.unit || '',
+                priority: false,
+                emoji: aiSuggestion.emoji,
+                subcategory: aiSuggestion.subcategory ?? null,
+                completed: false,
+                user_id: '',
+                user_name: '',
+                user_avatar: '',
+                household_id: ''
+              };
+              
+              await onAddItem(itemToAdd);
+              continue;
+            }
+
+            // Step 1: First determine the main category
+            const mainCategoryPrompt = `Given the Dutch grocery item name "${ingredient.name}", determine which main category it belongs to. Only return the category name, nothing else.
+            Available categories: ${CATEGORIES.join(', ')}`;
+
+            const mainCategoryResult = await model.generateContent(mainCategoryPrompt);
+            const mainCategory = mainCategoryResult.response.text().trim();
+
+            // Step 2: Then determine the subcategory based on the main category
+            const subcategoryPrompt = `Given the Dutch grocery item "${ingredient.name}" which belongs to the main category "${mainCategory}", determine:
+            1. The most appropriate subcategory from the list below
+            2. An appropriate emoji for this item
+
+            Return as JSON:
+            {
+              "subcategory": "subcategory name",
+              "emoji": "emoji"
+            }
+
+            Available subcategories for ${mainCategory}:
+            ${getSubcategoriesForMainCategory(mainCategory).join(', ')}`;
+
+            const subcategoryResult = await model.generateContent(subcategoryPrompt);
+            const subcategoryText = subcategoryResult.response.text().trim();
+            const subcategoryData = JSON.parse(subcategoryText.replace(/```json\n?|\n?```/g, '').trim());
+
+            // Create the item with AI suggestions
+            const itemToAdd: CreateGroceryItem = {
+              name: ingredient.name,
+              category: mainCategory as Category,
+              quantity: ingredient.amount ? `${ingredient.amount} ${ingredient.unit || ''}`.trim() : '1',
+              unit: ingredient.unit || '',
+              priority: false,
+              emoji: subcategoryData.emoji,
+              subcategory: subcategoryData.subcategory,
+              completed: false,
+              user_id: '',
+              user_name: '',
+              user_avatar: '',
+              household_id: ''
+            };
+
+            console.log('Adding ingredient with AI data:', itemToAdd);
+            await onAddItem(itemToAdd);
+
+          } catch (error) {
+            console.error('Error processing ingredient:', ingredient.name, error);
+            // Fallback to basic categorization for this ingredient
+            const aiSuggestion = await aiService.getItemSuggestions(ingredient.name);
+            const itemToAdd: CreateGroceryItem = {
+              name: ingredient.name,
+              category: aiSuggestion.category as Category,
+              quantity: ingredient.amount ? `${ingredient.amount} ${ingredient.unit || ''}`.trim() : '1',
+              unit: ingredient.unit || '',
+              priority: false,
+              emoji: aiSuggestion.emoji,
+              subcategory: aiSuggestion.subcategory ?? null,
+              completed: false,
+              user_id: '',
+              user_name: '',
+              user_avatar: '',
+              household_id: ''
+            };
+            
+            await onAddItem(itemToAdd);
+          }
         }
       }
       
@@ -472,6 +575,22 @@ export function AddProductDrawer({
     };
     console.log('Item being sent to addItem:', itemToAdd);
     onAddItem(itemToAdd);
+    
+    // Reset the newItem state to initial values
+    onItemChangeRef.current({
+      name: '',
+      quantity: '',
+      unit: '',
+      category: 'Overig',
+      subcategory: null,
+      priority: false,
+      emoji: '📦',
+      user_id: '',
+      user_name: null,
+      user_avatar: null,
+      household_id: ''
+    });
+    
     onClose();
   };
 
@@ -642,7 +761,7 @@ export function AddProductDrawer({
                                 key={category}
                                 type="button"
                                 onClick={() => {
-                                  onItemChange({ ...newItem, category: category as Category });
+                                  onItemChangeRef.current({ ...newItem, category: category as Category });
                                   setIsDropdownOpen(false);
                                 }}
                                 className={cn(
@@ -667,7 +786,7 @@ export function AddProductDrawer({
                     id="quantity"
                     placeholder="Bijv. 2 pakken"
                     value={newItem.quantity}
-                    onChange={(e) => onItemChange({ ...newItem, quantity: e.target.value })}
+                    onChange={(e) => onItemChangeRef.current({ ...newItem, quantity: e.target.value })}
                     className="rounded-xl"
                   />
                 </div>
@@ -679,7 +798,7 @@ export function AddProductDrawer({
                   <Switch
                     id="priority"
                     checked={newItem.priority}
-                    onCheckedChange={(checked) => onItemChange({ ...newItem, priority: checked })}
+                    onCheckedChange={(checked) => onItemChangeRef.current({ ...newItem, priority: checked })}
                   />
                 </div>
 

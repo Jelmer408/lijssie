@@ -273,6 +273,38 @@ export function Header({
                     </p>
                   </div>
 
+                  {/* Invite Code */}
+                  <div>
+                    <label className="text-sm font-medium text-blue-800 mb-2 block">
+                      Uitnodigingscode
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={household?.invite_code || ''}
+                        className="flex-1 px-3 py-2 bg-white rounded-xl border border-blue-100 text-blue-800 font-mono"
+                        readOnly
+                      />
+                      <button
+                        onClick={async () => {
+                          if (household?.invite_code) {
+                            await navigator.clipboard.writeText(household.invite_code);
+                            toast({
+                              title: "Gekopieerd!",
+                              description: "De uitnodigingscode is gekopieerd naar je klembord.",
+                            });
+                          }
+                        }}
+                        className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl border border-blue-100 transition-colors duration-200"
+                      >
+                        Kopieer
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">
+                      Deel deze code met anderen om ze uit te nodigen voor je huishouden
+                    </p>
+                  </div>
+
                   <div className="w-full h-px bg-blue-100/50" />
 
                   {/* Members List */}

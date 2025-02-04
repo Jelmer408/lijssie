@@ -1,6 +1,7 @@
 import { aiService } from './ai-service';
 import type { RecipeIngredient } from '@/types/recipe';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { CATEGORIES, Category, categoryEmojis } from '@/constants/categories';
 
 // Add interface for receipt data
 interface ReceiptItem {
@@ -226,6 +227,43 @@ export const recipeVisionService = {
         const enrichedIngredients = await Promise.all(
           validatedIngredients.map(async (ing: any) => {
             try {
+              // Step 1: First determine the main category
+              const mainCategoryPrompt = `Given the Dutch grocery item name "${ing.name}", determine which main category it belongs to. Only return the category name, nothing else.
+              Available categories: ${CATEGORIES.join(', ')}`;
+
+              const mainCategoryResult = await model.generateContent(mainCategoryPrompt);
+              const mainCategory = mainCategoryResult.response.text().trim();
+
+              // Step 2: Then determine the subcategory based on the main category
+              const subcategoryPrompt = `Given the Dutch grocery item "${ing.name}" which belongs to the main category "${mainCategory}", determine:
+              1. The most appropriate subcategory from the list below
+              2. An appropriate emoji for this item
+
+              Return as JSON:
+              {
+                "subcategory": "subcategory name",
+                "emoji": "emoji"
+              }
+
+              Available subcategories for ${mainCategory}:
+              ${this.getSubcategoriesForMainCategory(mainCategory).join(', ')}`;
+
+              const subcategoryResult = await model.generateContent(subcategoryPrompt);
+              const subcategoryText = subcategoryResult.response.text().trim();
+              const subcategoryData = JSON.parse(subcategoryText.replace(/```json\n?|\n?```/g, '').trim());
+
+              return {
+                id: crypto.randomUUID(),
+                name: ing.name.toLowerCase(),
+                amount: ing.amount,
+                unit: ing.unit.toLowerCase(),
+                emoji: subcategoryData.emoji,
+                category: mainCategory as Category,
+                subcategory: subcategoryData.subcategory
+              };
+            } catch (error) {
+              console.error('Error enriching ingredient:', ing.name, error);
+              // Fallback to basic categorization
               const suggestion = await aiService.getItemSuggestions(ing.name);
               return {
                 id: crypto.randomUUID(),
@@ -233,17 +271,8 @@ export const recipeVisionService = {
                 amount: ing.amount,
                 unit: ing.unit.toLowerCase(),
                 emoji: suggestion.emoji,
-                category: suggestion.category
-              };
-            } catch (error) {
-              console.error('Error enriching ingredient:', ing.name, error);
-              return {
-                id: crypto.randomUUID(),
-                name: ing.name.toLowerCase(),
-                amount: ing.amount,
-                unit: ing.unit.toLowerCase(),
-                emoji: '🍽️',
-                category: 'overig'
+                category: suggestion.category as Category,
+                subcategory: suggestion.subcategory ?? null
               };
             }
           })
@@ -429,5 +458,59 @@ export const recipeVisionService = {
     }
 
     return processedItems;
+  },
+
+  // Helper function to get subcategories for a main category
+  getSubcategoriesForMainCategory(mainCategory: string): string[] {
+    switch (mainCategory) {
+      case 'Aardappel, groente en fruit':
+        return ['Aardappelen', 'Groente', 'Fruit', 'Diepvries groente', 'Diepvries fruit', 'Gezonde kruiden', 'Snackgroente en snackfruit', 'Fruitsalde', 'Smoothies en sappen'];
+      case 'Salades en maaltijden':
+        return ['Salades', 'Kant en klare maaltijden', 'Quiches', 'Ovenschotels', 'Poffertjes en pannenkoeken', 'Pizza', 'Verse soepen', 'Verspakketten', 'Diepvries kant en klare maaltijden', 'Snel snacken', 'Sandwiches', 'Sushi'];
+      case 'Kaas, vleeswaren en tapas':
+        return ['Kaas', 'Vleeswaren', 'Hummus', 'Borrelhapjes', 'Droge worst', 'Dips en smeersels'];
+      case 'Vlees, kip en vis':
+        return ['Vlees', 'Vis', 'Rundvlees', 'Varkensvlees', 'Kip', 'Kalkoen', 'Halal', 'BBQ en Gourmet', 'Reepjes en blokjes vlees', 'Worst', 'Schelpdieren', 'Kalfsvlees en wild'];
+      case 'Vegetarisch, plantaardig en vegan':
+        return ['Vleesvervangers', 'Plantaardige', 'Visvervangers', 'Vegetarische en plantaardige vleeswaren', 'Tofu', 'Vegetarische spreads', 'Plantaardige spreads', 'Vegetarische snack', 'Plantaardige kaas'];
+      case 'Zuivel, boter en eieren':
+        return ['Zuivel', 'Eieren', 'Kaas', 'Boter en margarine', 'Melk', 'High Protein zuivel', 'Yoghurt en kwark', 'Koffiemelk en room', 'Toetjes', 'Drinkyohurt', 'Lactosevrijve zuivel', 'Zuivel tussendoortjes'];
+      case 'Broden, bakkerij en banket':
+        return ['Brood', 'Gebak en taart', 'Broodvervangers', 'Crackers en beschuit', 'Afbakbrood', 'Koek en cake', 'Toastcrackers', 'Koolhydraatarm en glutenvrij'];
+      case 'Ontbijtgranen en beleg':
+        return ['Ontbijtgranen', 'Zoet beleg', 'Broodsalades', 'Hartig broodbeleg', 'Vleeswaren beleg', 'Kaas beleg', 'Cereals en muesli', 'Poeders', 'Halal beleg', 'Plantaardig zoet beleg', 'Ontbijtkoek', 'Beschuiten', 'Crackers'];
+      case 'Snoep, koek en chocolade':
+        return ['Chocolade', 'Koeken', 'Drop', 'Snoepjes', 'Pepermunt en kauwgom', 'Zoete snacks', 'Bakken', 'Uitdeelzakken', 'Fruitbiscuit'];
+      case 'Chips, popcorn en noten':
+        return ['Chips', 'Noten', 'Popcorn', 'Zoutjes', 'Toastjes'];
+      case 'Tussendoortjes':
+        return ['Mueslirepen', 'Fruitsnacks', 'Notenrepen', 'Fruitrepen', 'Eiwitrepen', 'Ontbuitkoekrepen', 'Rijstwafels', 'Drinkboillon', 'Knackebrod'];
+      case 'Frisdrank en sappen':
+        return ['Frisdrank', 'Water', 'Sap', 'Energie drink', 'Smooties', 'Siroop en limonade', 'Water met smaak', 'Ice tea', 'Drinkpakjes'];
+      case 'Koffie en thee':
+        return ['Koffie', 'Thee'];
+      case 'Bier, wijn en aperitieven':
+        return ['Bier', 'Wijn', 'Sterke drank', 'Speciaalbier', 'Alcoholvrij bier', 'Aperitieven en mixdranken'];
+      case 'Pasta, rijst en wereldkeuken':
+        return ['Pasta', 'Rijst', 'Noedels en mie', 'Speciale voeding', 'Olie en azijn', 'Indonesisch', 'Italiaans en mediteriaans', 'Oosterse keuken', 'Maaltijdpakketten en mixen', 'Mexicaans', 'Hollandse keuken'];
+      case 'Soepen, sauzen, kruiden en olie':
+        return ['Soepen', 'Sauzen', 'Kruiden', 'Conserven', 'Smaakmakers', 'Garnering'];
+      case 'Sport en dieetvoeding':
+        return ['Supplementen en vitamines', 'Sportvoeding', 'Proteine poeder', 'Eiwitshakes', 'Dieetvoeding', 'Optiek', 'Zelfzorg'];
+      case 'Diepvries':
+        return ['IJs', 'Diepvries pizza', 'Diepvries snacks', 'Diepvries aardappel', 'Diepvries vis en vlees', 'Diepvries gebak en bladerdeeg', 'Diepvries kant en klare maaltijden', 'Diepvries glutenvrij', 'Diepvries babyvoeding'];
+      case 'Drogisterij':
+        return ['Lichaamsverzorging', 'Mondverzorging', 'Pijnstillers', 'Haarverzorging', 'Make up', 'Maandverband en tampons', 'Intimiteit'];
+      case 'Baby en kind':
+        return ['Luiers en doekjes', 'Babyvoeding', 'Baby en kind verzorging', 'Zwangerschap', 'Baby gezondheid'];
+      case 'Huishouden':
+        return ['Schoonmaakmiddelen', 'Wasmiddel en wasverzachters', 'Luchtverfrissers', 'Vaatwas en afwasmiddelen', 'Schoonmaak producten', 'Vuilniszakken en folies', 'Toiletpapier', 'Tissues en keukenpapier'];
+      case 'Huisdier':
+        return ['Honden', 'Katten', 'Vissen', 'Knaagdieren', 'Vogels'];
+      case 'Koken, tafelen en vrije tijd':
+        return ['Koken en bakken'];
+      default:
+        return [];
+    }
   }
 }; 
