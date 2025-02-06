@@ -17,6 +17,7 @@ import { RecipeIngredient } from '@/types/recipe'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { CreateGroceryItem, NewItemState } from '@/types/grocery'
 import { supabase } from '@/lib/supabase'
+import { getSubcategoriesForMainCategory } from '@/components/sales/SaleRecommendations'
 
 // Get API key from environment variable
 const GOOGLE_AI_KEY = import.meta.env.VITE_GOOGLE_AI_KEY;

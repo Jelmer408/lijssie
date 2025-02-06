@@ -19,7 +19,7 @@ const genAI = new GoogleGenerativeAI(GOOGLE_AI_KEY);
 const model = genAI.getGenerativeModel({ model: GOOGLE_AI_MODEL });
 
 // Helper function to get subcategories for a main category
-function getSubcategoriesForMainCategory(mainCategory: string): string[] {
+export function getSubcategoriesForMainCategory(mainCategory: string): string[] {
   switch (mainCategory) {
     case 'Aardappel, groente en fruit':
       return ['Aardappelen', 'Groente', 'Fruit', 'Diepvries groente', 'Diepvries fruit', 'Gezonde kruiden', 'Snackgroente en snackfruit', 'Fruitsalde', 'Smoothies en sappen'];

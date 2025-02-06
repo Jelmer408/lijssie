@@ -5,11 +5,12 @@ import { useToast } from '@/components/ui/use-toast';
 import { ProductsGrid } from './ProductsGrid';
 import { useHousehold } from '@/contexts/household-context';
 import { SalesLayout } from '../sales/SalesLayout';
+import { Product } from '@/services/products-service';
 
 export function ProductsScreen() {
   const { toast } = useToast();
   const { household } = useHousehold();
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export function ProductsScreen() {
     }
   }
 
-  const handleProductClick = (product) => {
+  const handleProductClick = (product: Product) => {
     // TODO: Implement product click handler
     console.log('Product clicked:', product);
   };
