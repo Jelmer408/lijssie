@@ -72,12 +72,38 @@ export function getSubcategoriesForMainCategory(mainCategory: string): string[] 
   }
 }
 
-// Fuse.js options for fuzzy matching
+// Fuse.js options for fuzzy matching - Making it more Dutch-friendly
 const fuseOptions = {
   includeScore: true,
-  threshold: 0.6,
+  threshold: 0.8, // Increased from 0.6 to 0.8 to be more lenient
   minMatchCharLength: 2,
-  keys: ['saleItem.productName']
+  keys: ['saleItem.productName'],
+  // Add Dutch-specific options
+  ignoreLocation: true, // Ignore location of the match in the string
+  shouldSort: true,
+  findAllMatches: true,
+  // Add Dutch-specific normalization
+  getFn: (obj: Record<string, any>, path: string | string[]): string | string[] => {
+    const pathArray = Array.isArray(path) ? path : path.split('.');
+    const value = pathArray.reduce((acc: any, part: string) => acc?.[part], obj);
+    if (typeof value === 'string') {
+      return value
+        // Convert to lowercase
+        .toLowerCase()
+        // Replace Dutch specific characters
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        // Replace common Dutch words and variations
+        .replace(/\b(het|de|een)\b/g, '')
+        .replace(/\b(je|jouw|mijn)\b/g, '')
+        .replace(/\b(van|voor|met)\b/g, '')
+        .replace(/\b(en|of|maar)\b/g, '')
+        // Remove multiple spaces
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    return Array.isArray(value) ? value : '';
+  }
 };
 
 interface SupermarketStore {
@@ -164,12 +190,29 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
 
   const filterRecommendationsByFuzzyMatch = (groceryItemName: string, recommendations: Array<any>) => {
     const fuse = new Fuse(recommendations, fuseOptions);
-    const results = fuse.search(groceryItemName);
     
-    // Keep matches with a more lenient score threshold
-    return results
-      .filter(result => result.score && result.score < 0.8)
+    // Normalize the search query the same way as the items
+    const normalizedQuery = groceryItemName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\b(het|de|een)\b/g, '')
+      .replace(/\b(je|jouw|mijn)\b/g, '')
+      .replace(/\b(van|voor|met)\b/g, '')
+      .replace(/\b(en|of|maar)\b/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    const results = fuse.search(normalizedQuery);
+    
+    // Keep all matches with a more lenient score threshold
+    // Return all recommendations if no good matches are found
+    const filteredResults = results
+      .filter(result => result.score && result.score < 0.9) // Increased threshold
       .map(result => result.item);
+
+    // If no matches found with fuzzy search, return all recommendations
+    return filteredResults.length > 0 ? filteredResults : recommendations;
   };
 
   useEffect(() => {
@@ -192,7 +235,7 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
         newRecs.forEach(rec => {
           const key = rec.groceryItem.id;
           
-          // Apply fuzzy matching to filter recommendations
+          // Apply fuzzy matching to filter recommendations, but keep all if no good matches
           const filteredRecommendations = filterRecommendationsByFuzzyMatch(
             rec.groceryItem.name,
             rec.recommendations
