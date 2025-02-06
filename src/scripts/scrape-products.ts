@@ -212,6 +212,21 @@ async function scrapeProducts() {
             return Array.from(paginationContainer).length || 1; // Default to 1 if no pagination
           });
           totalPages = hasNextPage;
+
+          const allLiTags = await page.evaluate(() => {
+            const paginationContainer = document.querySelectorAll('#__nuxt > div > main > main > section > div > div > div.min-h-dvh.w-full > div.mx-auto.my-2.md\\:mt-4 > div > ul > li');
+            return Array.from(paginationContainer).length
+
+          })
+          if (allLiTags === 4) {
+            const pagination_size = await page.evaluate(() => {
+              const paginationElement :any = document.querySelector('#__nuxt > div > main > main > section > div > div > div.min-h-dvh.w-full > div.mx-auto.my-2.md\\:mt-4 > div > ul > li.flex.cursor-pointer.items-center:not(.ml-2) > a');
+              return paginationElement ? paginationElement.innerText : null;
+            });
+            if (pagination_size) {
+              totalPages = parseInt(pagination_size)
+            }
+          }
           totalCheck = false;
           console.log(`Found ${totalPages} pages for subcategory: ${subcategory.name}`);
         }
@@ -225,7 +240,7 @@ async function scrapeProducts() {
         console.log(`On page ${pageNumber}`);
         // console.log(`Found ${productUrls.length} products on page ${pageNumber}`);
 
-        const pageProducts = [];
+        const pageProducts: any = [];
         for (const productUrl of productUrls) {
           try {
             await page.goto(productUrl, { waitUntil: 'networkidle2' });
@@ -246,7 +261,7 @@ async function scrapeProducts() {
                 const scrollInterval = setInterval(() => {
                   window.scrollBy(0, distance);
                   totalHeight += distance;
-            
+
                   if (totalHeight >= document.body.scrollHeight) {
                     clearInterval(scrollInterval);
                     resolve();
@@ -335,7 +350,7 @@ async function scrapeProducts() {
           }
         }
 
-        const validProducts = pageProducts.filter((product): product is Product => product !== null);
+        const validProducts = pageProducts.filter((product: Product | null): product is Product => product !== null);
         subCatAllProducts = [...subCatAllProducts, ...validProducts];
         pageNumber++;
 
