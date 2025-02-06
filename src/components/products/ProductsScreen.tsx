@@ -6,22 +6,74 @@ import { ProductsGrid } from './ProductsGrid';
 import { useHousehold } from '@/contexts/household-context';
 import { SalesLayout } from '../sales/SalesLayout';
 import { Product } from '@/services/products-service';
+import { GroceryItem } from '@/types/grocery';
+import { Category } from '@/constants/categories';
+import { StorePrice } from '@/types/store';
 
 export function ProductsScreen() {
   const { toast } = useToast();
   const { household } = useHousehold();
   const [products, setProducts] = useState<Product[]>([]);
+  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadProducts();
   }, []);
 
+  // Map Product to GroceryItem
+  const mapProductToGroceryItem = (product: Product): GroceryItem => {
+    const stores: StorePrice[] = product.supermarket_data.map(store => {
+      const priceStr = store.price.replace('€', '').replace(',', '.').trim();
+      const price = parseFloat(priceStr);
+      
+      return {
+        name: store.name,
+        price: isNaN(price) ? 0 : price,
+        current_price: store.price,
+        original_price: store.pricePerUnit,
+        sale_type: store.offerText,
+        valid_until: store.offerEndDate
+      };
+    });
+
+    return {
+      id: product.id,
+      name: product.title,
+      quantity: product.quantity_info || '1',
+      unit: 'stuk',
+      category: product.main_category as Category,
+      subcategory: product.subcategory,
+      priority: false,
+      completed: false,
+      emoji: '🛒',
+      user_id: household?.id || '',
+      user_name: null,
+      user_avatar: null,
+      household_id: household?.id || null,
+      created_at: product.created_at,
+      updated_at: product.updated_at,
+      supermarket: product.supermarket_data?.[0]?.name || null,
+      current_price: product.supermarket_data?.[0]?.price || null,
+      original_price: product.supermarket_data?.[0]?.pricePerUnit || null,
+      sale_type: product.supermarket_data?.[0]?.offerText || null,
+      valid_until: product.supermarket_data?.[0]?.offerEndDate || null,
+      image_url: product.image_url,
+      is_deleted: false,
+      product_url: product.url,
+      product_id: product.id,
+      stores
+    };
+  };
+
   async function loadProducts() {
     try {
       setIsLoading(true);
       const data = await productsService.getProducts();
       setProducts(data);
+      // Map products to grocery items
+      const mappedItems = data.map(mapProductToGroceryItem);
+      setGroceryItems(mappedItems);
     } catch (error) {
       console.error('Error loading products:', error);
       toast({
@@ -66,7 +118,7 @@ export function ProductsScreen() {
       </div>
 
       <SalesLayout 
-        groceryList={products} 
+        groceryList={groceryItems} 
         householdName={household?.name}
       />
 

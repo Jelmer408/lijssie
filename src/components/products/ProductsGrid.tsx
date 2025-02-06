@@ -1,23 +1,6 @@
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-
-interface Product {
-  id: string;
-  title: string;
-  image_url: string;
-  quantity_info: string;
-  category: string;
-  subcategory: string;
-  main_category: string;
-  supermarket_data: Array<{
-    name: string;
-    logoUrl: string;
-    price: string;
-    pricePerUnit: string;
-    offerText?: string;
-    offerEndDate?: string;
-  }>;
-}
+import { Product } from '@/services/products-service';
 
 interface ProductsGridProps {
   products: Product[];
