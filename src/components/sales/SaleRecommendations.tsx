@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GroceryItem } from '@/types/grocery';
-import { Loader2, ChevronDown, ArrowRightLeft, Check, Search, X, MessageSquareWarning, Plus } from 'lucide-react';
+import { Loader2, ChevronDown, ArrowRightLeft, Check, Search, X, MessageSquareWarning, Plus, Package, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { hybridSearchService } from '@/services/hybrid-search-service';
@@ -9,6 +9,9 @@ import Fuse from 'fuse.js';
 import { groceryService } from '@/services/grocery-service';
 import { CATEGORIES, Category } from '@/constants/categories';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { toast } from '@/components/ui/use-toast';
+import { WatchlistProductSearchDrawer } from '@/components/watchlist/watchlist-product-search-drawer';
+import { TrackedProductsList } from '@/components/watchlist/tracked-products-list';
 
 // Get API key from environment variable
 const GOOGLE_AI_KEY = import.meta.env.VITE_GOOGLE_AI_KEY;
@@ -126,6 +129,7 @@ interface SearchResult {
   savingsPercentage: number;
 }
 
+
 export function SaleRecommendations({ groceryList, householdName, onPopupChange }: SaleRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<GroupedRecommendations>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -136,9 +140,11 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
-  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
+  const [, setHasSeenWelcome] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState<Set<string>>(new Set());
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
+  const [showWatchlistSearch, setShowWatchlistSearch] = useState(false);
+  const [currentHouseholdId, setCurrentHouseholdId] = useState<string | undefined>();
 
   // Check welcome message status
   useEffect(() => {
@@ -150,6 +156,13 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
       setHasSeenWelcome(true);
     }
   }, [onPopupChange]);
+
+  // Get household ID from first grocery item
+  useEffect(() => {
+    if (groceryList.length > 0 && groceryList[0].household_id) {
+      setCurrentHouseholdId(groceryList[0].household_id);
+    }
+  }, [groceryList]);
 
   // Load recommendations when groceryList changes
   useEffect(() => {
@@ -186,8 +199,8 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
               ...item,
               saleItem: {
                 ...item.saleItem,
-                supermarkets: item.saleItem.supermarkets?.filter(store =>
-                  store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+                supermarkets: item.saleItem.supermarkets?.filter((value: { supermarket_data?: { offerText?: string } }) =>
+                  value.supermarket_data?.offerText && value.supermarket_data.offerText !== ''
                 )
               }
             }));
@@ -241,8 +254,8 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
     // 1. Get all products that have offer text in supermarket_data
     const productsOnSale = recommendations.filter(rec => {
       // Check if any supermarket has an offer text
-      const hasActiveSale = rec.saleItem.supermarkets?.some((store: SupermarketStore) => 
-        store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+      const hasActiveSale = rec.saleItem.supermarkets?.some((value: { supermarket_data?: { offerText?: string } }) => 
+        value.supermarket_data?.offerText && value.supermarket_data.offerText !== ''
       );
 
       // Only include if there's an active sale with offer text
@@ -269,8 +282,8 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
       ...result.item,
       saleItem: {
         ...result.item.saleItem,
-        supermarkets: result.item.saleItem.supermarkets?.filter(store =>
-          store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+        supermarkets: result.item.saleItem.supermarkets?.filter((value: { supermarket_data?: { offerText?: string } }) =>
+          value.supermarket_data?.offerText && value.supermarket_data.offerText !== ''
         )
       }
     }));
@@ -344,8 +357,8 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
           ...item,
           saleItem: {
             ...item.saleItem,
-            supermarkets: item.saleItem.supermarkets?.filter((store: SupermarketStore) =>
-              store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+            supermarkets: item.saleItem.supermarkets?.filter((value: { supermarket_data?: { offerText?: string } }) =>
+              value.supermarket_data?.offerText && value.supermarket_data.offerText !== ''
             )
           }
         }));
@@ -494,19 +507,68 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
     }
   }
 
-    return (
-    <div className="w-full max-w-md mx-auto px-4">
+  // Add function to handle adding to watchlist
+  const handleAddToWatchlist = async (productId: string) => {
+    try {
+      // First check if the product is already in the watchlist
+      const { data: existingEntry } = await supabase
+        .from('product_watchlist')
+        .select('id')
+        .eq('product_id', productId)
+        .eq('household_id', groceryList[0]?.household_id)
+        .single();
+
+      if (existingEntry) {
+        toast({
+          title: "Product staat al in je watchlist",
+          description: "Je krijgt al een melding zodra dit product in de aanbieding is.",
+          duration: 3000,
+        });
+        return;
+      }
+
+      // If not in watchlist, add it
+      const { error } = await supabase
+        .from('product_watchlist')
+        .insert([
+          {
+            product_id: productId,
+            household_id: groceryList[0]?.household_id,
+            created_at: new Date().toISOString(),
+          }
+        ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Product toegevoegd aan watchlist",
+        description: "We sturen je een bericht zodra dit product in de aanbieding is.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Error adding to watchlist:', error);
+      toast({
+        title: "Er is iets misgegaan",
+        description: "Probeer het later opnieuw.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+
+  return (
+    <>
       <AnimatePresence>
         {showWelcomePopup && (
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             style={{ touchAction: 'none' }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-white"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-white"
           >
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 0 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
               className="w-full max-w-lg px-6"
@@ -569,388 +631,437 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
         )}
       </AnimatePresence>
 
-      {/* Search Bar - Always visible */}
-          <div className="mb-6">
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10">
-                <Search className="h-5 w-5 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-300" strokeWidth={2} />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  debouncedSearch(e.target.value);
-                }}
-                placeholder="Zoek in alle aanbiedingen..."
-                className="w-full pl-12 pr-12 py-3.5 bg-white/80 hover:bg-white/90 focus:bg-white backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-sm text-[15px] text-gray-900 placeholder-gray-500 outline-none ring-0 focus:ring-2 ring-offset-0 ring-blue-500/20 transition-all duration-300"
-              />
-              {searchQuery && (
-                <div className="absolute inset-y-0 right-4 flex items-center">
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      setSearchResults([]);
-                    }}
-                    className="p-1.5 rounded-full hover:bg-gray-100/80 transition-colors duration-200"
-                  >
-                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors duration-200" />
-                  </button>
-                </div>
-              )}
-              <div className="absolute inset-0 -z-10 rounded-2xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <div className="w-full max-w-md mx-auto px-4">
+        {/* Search Bar - Always visible */}
+        <div className="mb-6">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10">
+              <Search className="h-5 w-5 text-gray-400 group-focus-within:text-gray-600 transition-colors duration-300" strokeWidth={2} />
             </div>
-          </div>
-
-      {/* Search Results - Show when there are search results */}
-          {searchQuery && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-900">Zoekresultaten</h3>
-                {isSearching ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                ) : (
-                  <span className="text-xs text-gray-500">{searchResults.length} resultaten</span>
-                )}
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                debouncedSearch(e.target.value);
+              }}
+              placeholder="Zoek in alle aanbiedingen..."
+              className="w-full pl-12 pr-12 py-3.5 bg-white/80 hover:bg-white/90 focus:bg-white backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-sm text-[15px] text-gray-900 placeholder-gray-500 outline-none ring-0 focus:ring-2 ring-offset-0 ring-blue-500/20 transition-all duration-300"
+            />
+            {searchQuery && (
+              <div className="absolute inset-y-0 right-4 flex items-center">
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                  className="p-1.5 rounded-full hover:bg-gray-100/80 transition-colors duration-200"
+                >
+                  <X className="h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors duration-200" />
+                </button>
               </div>
-              <div className="space-y-2.5">
-                <AnimatePresence>
-                  {searchResults.map((result, index) => (
-                    <motion.div
-                      key={`search-${result.saleItem.id}-${index}`}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-sm p-3"
-                    >
-                      <div className="flex items-start gap-2.5 p-2.5">
-                        {result.saleItem.imageUrl && (
-                          <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100/50">
-                            <img
-                              src={result.saleItem.imageUrl}
-                              alt={result.saleItem.productName}
-                              className="w-full h-full object-cover"
-                            />
-                            </div>
-                          )}
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-[13px] text-gray-900 leading-tight mb-1.5">
-                              {result.saleItem.productName}
-                            </h4>
-                          
-                          <div className="space-y-1">
-                            {result.saleItem.supermarkets?.map((store: SupermarketStore) => (
-                              <div key={store.name} className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1.5 px-2">
-                                <div className="flex items-center gap-2">
-                                  <img
-                                    src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
-                                    alt={store.name}
-                                className="w-4 h-4 object-contain"
-                              />
-                                  <div className="flex items-baseline gap-1.5">
-                                    <span className={cn(
-                                      "font-medium text-[13px]",
-                                      store.isRegularPrice ? "text-gray-900" : "text-green-700"
-                                    )}>
-                                      €{store.currentPrice}
+            )}
+            <div className="absolute inset-0 -z-10 rounded-2xl bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Search Results - Show when there are search results */}
+        {searchQuery && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-900">Zoekresultaten</h3>
+              {isSearching ? (
+                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+              ) : (
+                <span className="text-xs text-gray-500">{searchResults.length} resultaten</span>
+              )}
+            </div>
+            <div className="space-y-2.5">
+              <AnimatePresence>
+                {searchResults.length === 0 && !isSearching && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-sm p-6"
+                  >
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center">
+                        <Package className="w-6 h-6 text-blue-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-medium text-gray-900">
+                          Geen aanbiedingen gevonden
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          Wil je een melding krijgen zodra dit product in de aanbieding is?
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowWatchlistSearch(true)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-xl shadow-sm transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Voeg toe aan watchlist
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+                {searchResults.map((result, index) => (
+                  <motion.div
+                    key={`search-${result.saleItem.id}-${index}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-sm p-3"
+                  >
+                    <div className="flex items-start gap-2.5 p-2.5">
+                      {result.saleItem.imageUrl && (
+                        <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100/50">
+                          <img
+                            src={result.saleItem.imageUrl}
+                            alt={result.saleItem.productName}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-[13px] text-gray-900 leading-tight mb-1.5">
+                          {result.saleItem.productName}
+                        </h4>
+                        
+                        <div className="space-y-1">
+                          {result.saleItem.supermarkets?.map((store: SupermarketStore) => (
+                            <div key={store.name} className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1.5 px-2">
+                              <div className="flex items-center gap-2">
+                                <img
+                                  src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
+                                  alt={store.name}
+                                  className="w-4 h-4 object-contain"
+                                />
+                                <div className="flex items-baseline gap-1.5">
+                                  <span className={cn(
+                                    "font-medium text-[13px]",
+                                    store.isRegularPrice ? "text-gray-900" : "text-green-700"
+                                  )}>
+                                    €{store.currentPrice}
+                                  </span>
+                                  {store.isRegularPrice ? (
+                                    <span className="text-[11px] text-gray-600 font-medium">
+                                      Reguliere prijs
                                     </span>
-                                    {store.isRegularPrice ? (
-                                      <span className="text-[11px] text-gray-600 font-medium">
-                                        Reguliere prijs
-                            </span>
-                                    ) : store.supermarket_data?.offerText && (
-                                      <span className="text-[11px] text-green-600 font-medium">
-                                        {store.supermarket_data.offerText}
-                              </span>
-                            )}
-                                  </div>
-                          </div>
-                                
+                                  ) : store.supermarket_data?.offerText && (
+                                    <span className="text-[11px] text-green-600 font-medium">
+                                      {store.supermarket_data.offerText}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-1.5">
                                 <button
-                                  onClick={() => handleAddToGroceryList(result.saleItem, store)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToWatchlist(result.saleItem.id);
+                                  }}
+                                  className={cn(
+                                    "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
+                                    "bg-blue-50 hover:bg-blue-100 text-blue-600"
+                                  )}
+                                >
+                                  <Bell className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToGroceryList(result.saleItem, store);
+                                  }}
                                   disabled={isAddingItem.has(`search-${result.saleItem.id}-${store.name}`)}
                                   className={cn(
-                                    "group relative flex h-6 px-2 items-center justify-center rounded-md text-[11px] font-medium transition-all duration-200",
+                                    "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
                                     isAddingItem.has(`search-${result.saleItem.id}-${store.name}`)
                                       ? "bg-gray-100 text-gray-400"
                                       : addedItems.has(`search-${result.saleItem.id}-${store.name}`)
                                       ? "bg-green-100 hover:bg-green-200 text-green-700"
-                                      : "bg-blue-50 hover:bg-blue-100 text-blue-700"
+                                      : "bg-blue-50 hover:bg-blue-100 text-blue-600"
                                   )}
                                 >
                                   <AnimatePresence mode="wait">
                                     {isAddingItem.has(`search-${result.saleItem.id}-${store.name}`) ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : addedItems.has(`search-${result.saleItem.id}-${store.name}`) ? (
                                       <motion.div
                                         initial={{ scale: 0 }}
                                         animate={{ scale: 1 }}
                                         exit={{ scale: 0 }}
-                                        className="flex items-center gap-1"
                                       >
-                                        <Check className="h-3 w-3" />
-                                        <span>Toegevoegd</span>
+                                        <Check className="w-4 h-4" />
                                       </motion.div>
                                     ) : (
                                       <motion.div
                                         initial={{ scale: 0 }}
                                         animate={{ scale: 1 }}
                                         exit={{ scale: 0 }}
-                                        className="flex items-center gap-1"
                                       >
-                                        <Plus className="h-3 w-3" />
-                                        <span>Toevoegen</span>
+                                        <Plus className="w-4 h-4" />
                                       </motion.div>
                                     )}
                                   </AnimatePresence>
                                 </button>
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            </div>
-          )}
-
-      {isLoading ? (
-        <>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100/50">
-                <span className="text-xl">🏷️</span>
-              </div>
-              <div className="min-w-0 max-w-[calc(100%-2.5rem)]">
-                <h2 className={cn(
-                  "font-semibold text-gray-900 truncate",
-                  (householdName?.length ?? 0) > 20 ? "text-base" : "text-lg"
-                )}>
-                  Aanbiedingen
-                </h2>
-                <p className={cn(
-                  "text-gray-500 font-medium truncate",
-                  (householdName?.length ?? 0) > 30 ? "text-[11px]" : 
-                  (householdName?.length ?? 0) > 20 ? "text-xs" : 
-                  "text-sm"
-                )}>
-                  {householdName || 'Matches met jouw lijssie'}
-                </p>
-              </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
+        )}
 
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-sm overflow-hidden">
-                <div className="flex items-center gap-3 p-3">
-                  <div className="w-8 h-8 rounded-xl bg-gray-100 animate-pulse" />
-                  <div className="flex-1">
-                    <div className="h-4 w-24 bg-gray-100 rounded animate-pulse mb-1" />
-                    <div className="h-3 w-16 bg-gray-50 rounded animate-pulse" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : Object.keys(recommendations).length === 0 ? (
-      <div className="text-center p-4 text-gray-500 text-sm">
-        {groceryList.length === 0 ? (
-          "Voeg items toe aan je boodschappenlijst om aanbiedingen te zien."
-        ) : (
-          "Geen aanbiedingen gevonden voor je boodschappenlijst."
+        {/* Tracked Products Section */}
+        {currentHouseholdId && (
+          <TrackedProductsList 
+            householdId={currentHouseholdId}
+            className="mb-4"
+          />
         )}
-      </div>
-      ) : (
-        <>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100/50">
-            <span className="text-xl">🏷️</span>
-          </div>
-          <div className="min-w-0 max-w-[calc(100%-2.5rem)]">
-            <h2 className={cn(
-              "font-semibold text-gray-900 truncate",
-              (householdName?.length ?? 0) > 20 ? "text-base" : "text-lg"
-            )}>
-              Aanbiedingen
-            </h2>
-            <p className={cn(
-              "text-gray-500 font-medium truncate",
-              (householdName?.length ?? 0) > 30 ? "text-[11px]" : 
-              (householdName?.length ?? 0) > 20 ? "text-xs" : 
-              "text-sm"
-            )}>
-                  {householdName || 'Matches met jouw lijssie'}
-            </p>
-          </div>
-        </div>
-        {recommendations && Object.keys(recommendations).length > 0 && (
-          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
-            {Object.values(recommendations).reduce((total, group) => total + (group.recommendations?.length || 0), 0)} items
-          </span>
-        )}
-      </div>
-      <div className="space-y-2.5">
-        <AnimatePresence>
-          {Object.entries(recommendations || {}).map(([itemId, group]) => (
-            <motion.div
-              key={itemId}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-sm overflow-hidden"
-            >
-              {/* Grocery Item Header */}
-              <div
-                className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 transition-colors duration-200"
-                onClick={() => toggleExpanded(itemId)}
-              >
-                <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/50 flex-shrink-0">
-                  <span className="text-base">{group.groceryItem.emoji}</span>
+
+        {isLoading ? (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100/50">
+                  <span className="text-xl">🏷️</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-[13px] text-gray-900 truncate">
-                    {group.groceryItem.name}
-                  </h3>
-                  <p className="text-[11px] font-medium text-gray-500">
-                    {group.recommendations?.length || 0} aanbieding{(group.recommendations?.length || 0) !== 1 ? 'en' : ''}
+                <div className="min-w-0 max-w-[calc(100%-2.5rem)]">
+                  <h2 className={cn(
+                    "font-semibold text-gray-900 truncate",
+                    (householdName?.length ?? 0) > 20 ? "text-base" : "text-lg"
+                  )}>
+                    Aanbiedingen
+                  </h2>
+                  <p className={cn(
+                    "text-gray-500 font-medium truncate",
+                    (householdName?.length ?? 0) > 30 ? "text-[11px]" : 
+                    (householdName?.length ?? 0) > 20 ? "text-xs" : 
+                    "text-sm"
+                  )}>
+                    {householdName || 'Matches met jouw lijssie'}
                   </p>
                 </div>
-                <motion.div
-                  animate={{ rotate: expandedItems.has(itemId) ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="mr-1"
-                >
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
-                </motion.div>
               </div>
+            </div>
 
-              {/* Sale Items */}
-              <AnimatePresence>
-                {expandedItems.has(itemId) && group.recommendations && (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-3 p-3">
+                    <div className="w-8 h-8 rounded-xl bg-gray-100 animate-pulse" />
+                    <div className="flex-1">
+                      <div className="h-4 w-24 bg-gray-100 rounded animate-pulse mb-1" />
+                      <div className="h-3 w-16 bg-gray-50 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : Object.keys(recommendations).length === 0 ? (
+        <div className="text-center p-4 text-gray-500 text-sm">
+          {groceryList.length === 0 ? (
+            "Voeg items toe aan je boodschappenlijst om aanbiedingen te zien."
+          ) : (
+            "Geen aanbiedingen gevonden voor je boodschappenlijst."
+          )}
+        </div>
+        ) : (
+          <>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100/50">
+              <span className="text-xl">🏷️</span>
+            </div>
+            <div className="min-w-0 max-w-[calc(100%-2.5rem)]">
+              <h2 className="font-semibold text-gray-900 text-lg">
+                Aanbiedingen
+              </h2>
+            </div>
+          </div>
+          {recommendations && Object.keys(recommendations).length > 0 && (
+            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+              {Object.values(recommendations).reduce((total, group) => total + (group.recommendations?.length || 0), 0)} items
+            </span>
+          )}
+        </div>
+        <div className="space-y-2.5">
+          <AnimatePresence>
+            {Object.entries(recommendations || {}).map(([itemId, group]) => (
+              <motion.div
+                key={itemId}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-sm overflow-hidden"
+              >
+                {/* Grocery Item Header */}
+                <div
+                  className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 transition-colors duration-200"
+                  onClick={() => toggleExpanded(itemId)}
+                >
+                  <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/50 flex-shrink-0">
+                    <span className="text-base">{group.groceryItem.emoji}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-[13px] text-gray-900 truncate">
+                      {group.groceryItem.name}
+                    </h3>
+                    <p className="text-[11px] font-medium text-gray-500">
+                      {group.recommendations?.length || 0} aanbieding{(group.recommendations?.length || 0) !== 1 ? 'en' : ''}
+                    </p>
+                  </div>
                   <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
+                    animate={{ rotate: expandedItems.has(itemId) ? 180 : 0 }}
                     transition={{ duration: 0.2 }}
-                    className="border-t border-gray-100/50"
+                    className="mr-1"
                   >
-                    {group.recommendations.map((rec, index) => (
-                      <motion.div
-                        key={`${itemId}-${rec.saleItem.id}-${index}`}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className={cn(
-                          "flex items-start gap-2.5 p-2.5 hover:bg-gray-50/50 transition-colors duration-200",
-                          index !== group.recommendations.length - 1 && "border-b border-gray-100/50"
-                        )}
-                      >
-                        {/* Sale Item Image */}
-                        {rec.saleItem.imageUrl && (
-                          <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100/50">
-                            <img
-                              src={rec.saleItem.imageUrl}
-                              alt={rec.saleItem.productName}
-                              className="w-full h-full object-cover"
-                            />
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  </motion.div>
+                </div>
+
+                {/* Sale Items */}
+                <AnimatePresence>
+                  {expandedItems.has(itemId) && group.recommendations && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="border-t border-gray-100/50"
+                    >
+                      {group.recommendations.map((rec, index) => (
+                        <motion.div
+                          key={`${itemId}-${rec.saleItem.id}-${index}`}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className={cn(
+                            "flex items-start gap-2.5 p-2.5 hover:bg-gray-50/50 transition-colors duration-200",
+                            index !== group.recommendations.length - 1 && "border-b border-gray-100/50"
+                          )}
+                        >
+                          {/* Sale Item Image */}
+                          {rec.saleItem.imageUrl && (
+                            <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100/50">
+                              <img
+                                src={rec.saleItem.imageUrl}
+                                alt={rec.saleItem.productName}
+                                className="w-full h-full object-cover"
+                              />
                             </div>
                           )}
 
-                        {/* Sale Item Info */}
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-[13px] text-gray-900 leading-tight mb-1.5">
+                          {/* Sale Item Info */}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-[13px] text-gray-900 leading-tight mb-1.5">
                               {rec.saleItem.productName}
                             </h4>
-                          
-                          <div className="space-y-1">
-                            {rec.saleItem.supermarkets?.map((store: SupermarketStore) => (
-                              <div key={store.name} className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1.5 px-2">
-                            <div className="flex items-center gap-2">
-                                  <img
-                                    src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
-                                    alt={store.name}
-                                    className="w-4 h-4 object-contain"
-                                  />
-                                  <div className="flex items-baseline gap-1.5">
-                                    <span className={cn(
-                                      "font-medium text-[13px]",
-                                      store.isRegularPrice ? "text-gray-900" : "text-green-700"
-                                    )}>
-                                      €{store.currentPrice}
-                                    </span>
-                                    {store.isRegularPrice ? (
-                                      <span className="text-[11px] text-gray-600 font-medium">
-                                        Reguliere prijs
+                            
+                            <div className="space-y-1">
+                              {rec.saleItem.supermarkets?.map((store: SupermarketStore) => (
+                                <div key={store.name} className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1.5 px-2">
+                                  <div className="flex items-center gap-2">
+                                    <img
+                                      src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
+                                      alt={store.name}
+                                      className="w-4 h-4 object-contain"
+                                    />
+                                    <div className="flex items-baseline gap-1.5">
+                                      <span className={cn(
+                                        "font-medium text-[13px]",
+                                        store.isRegularPrice ? "text-gray-900" : "text-green-700"
+                                      )}>
+                                        €{store.currentPrice}
                                       </span>
-                                    ) : store.supermarket_data?.offerText && (
-                                      <span className="text-[11px] text-green-600 font-medium">
-                                        {store.supermarket_data.offerText}
-                                      </span>
-                                    )}
+                                      {store.isRegularPrice ? (
+                                        <span className="text-[11px] text-gray-600 font-medium">
+                                          Reguliere prijs
+                                        </span>
+                                      ) : store.supermarket_data?.offerText && (
+                                        <span className="text-[11px] text-green-600 font-medium">
+                                          {store.supermarket_data.offerText}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
+                                  
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSwitch(group.groceryItem, rec.saleItem, store);
+                                    }}
+                                    disabled={switchingItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`)}
+                                    className={cn(
+                                      "group relative flex h-6 px-2 items-center justify-center rounded-md text-[11px] font-medium transition-all duration-200",
+                                      switchedItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`)
+                                        ? "bg-green-100 hover:bg-green-200 text-green-700"
+                                        : store.isRegularPrice
+                                          ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                                          : "bg-blue-50 hover:bg-blue-100 text-blue-700"
+                                    )}
+                                  >
+                                    <AnimatePresence mode="wait">
+                                      {switchingItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`) ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : switchedItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`) ? (
+                                        <motion.div
+                                          initial={{ scale: 0 }}
+                                          animate={{ scale: 1 }}
+                                          exit={{ scale: 0 }}
+                                          className="flex items-center gap-1"
+                                        >
+                                          <Check className="h-3 w-3" />
+                                          <span>OK</span>
+                                        </motion.div>
+                                      ) : (
+                                        <motion.div
+                                          initial={{ scale: 0 }}
+                                          animate={{ scale: 1 }}
+                                          exit={{ scale: 0 }}
+                                          className="flex items-center gap-1"
+                                        >
+                                          <ArrowRightLeft className="h-3 w-3" />
+                                          <span>Wissel</span>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </button>
                                 </div>
-                                
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                    handleSwitch(group.groceryItem, rec.saleItem, store);
-                                }}
-                                  disabled={switchingItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`)}
-                                className={cn(
-                                    "group relative flex h-6 px-2 items-center justify-center rounded-md text-[11px] font-medium transition-all duration-200",
-                                    switchedItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`)
-                                      ? "bg-green-100 hover:bg-green-200 text-green-700"
-                                      : store.isRegularPrice
-                                        ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                                        : "bg-blue-50 hover:bg-blue-100 text-blue-700"
-                                )}
-                              >
-                                <AnimatePresence mode="wait">
-                                    {switchingItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`) ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : switchedItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`) ? (
-                                    <motion.div
-                                      initial={{ scale: 0 }}
-                                      animate={{ scale: 1 }}
-                                      exit={{ scale: 0 }}
-                                        className="flex items-center gap-1"
-                                    >
-                                        <Check className="h-3 w-3" />
-                                        <span>OK</span>
-                                    </motion.div>
-                                  ) : (
-                                    <motion.div
-                                      initial={{ scale: 0 }}
-                                      animate={{ scale: 1 }}
-                                      exit={{ scale: 0 }}
-                                        className="flex items-center gap-1"
-                                    >
-                                        <ArrowRightLeft className="h-3 w-3" />
-                                        <span>Wissel</span>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </button>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+          </>
+        )}
       </div>
-        </>
-      )}
-    </div>
+
+      {/* Product Selection Drawer */}
+      <WatchlistProductSearchDrawer
+        isOpen={showWatchlistSearch}
+        onClose={() => setShowWatchlistSearch(false)}
+        searchQuery={searchQuery}
+        onProductSelect={handleAddToWatchlist}
+      />
+    </>
   );
 } 

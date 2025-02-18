@@ -41,29 +41,14 @@ export interface Product {
   updated_at: string;
 }
 
-interface ProductWithSavings extends Product {
+export interface ProductWithSavings extends Product {
   savingsPercentage: number;
   currentPrice: string;
   originalPrice: string;
-  supermarkets: Array<{
-    name: string;
-    currentPrice: string;
-    originalPrice: string;
-    saleType?: string;
-    validUntil?: string;
-    savingsPercentage: number;
-    supermarket_data: {
-      name: string;
-      price: string;
-      offerText?: string;
-      offerEndDate?: string;
-      pricePerUnit: string;
-    };
-  }>;
+  supermarkets: Array<StoreWithOffer>;
   saleType?: string;
   validUntil?: string;
 }
-
 
 class ProductsService {
   async getProducts(category?: string): Promise<Product[]> {
@@ -327,6 +312,30 @@ class ProductsService {
         });
     } catch (error) {
       console.error('Error searching products on sale:', error);
+      return [];
+    }
+  }
+
+  async getAllSubcategories(): Promise<string[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('subcategory')
+        .not('subcategory', 'is', null)
+        .order('subcategory');
+
+      if (error) throw error;
+
+      // Get unique subcategories
+      const uniqueSubcategories = Array.from(new Set(
+        data
+          .map(item => item.subcategory)
+          .filter(Boolean) // Remove null/undefined values
+      ));
+
+      return uniqueSubcategories;
+    } catch (error) {
+      console.error('Error fetching subcategories:', error);
       return [];
     }
   }

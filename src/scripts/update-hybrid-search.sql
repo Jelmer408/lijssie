@@ -2,7 +2,10 @@
   DROP FUNCTION IF EXISTS hybrid_search(text, vector(512), int, float, float);
   DROP FUNCTION IF EXISTS hybrid_search(text, vector(384), int, float, float);
 
-  -- Create a function to expand Dutch synonyms
+  -- Drop existing function
+  DROP FUNCTION IF EXISTS expand_dutch_synonyms(text);
+
+  -- Create a more comprehensive Dutch synonyms function
   CREATE OR REPLACE FUNCTION expand_dutch_synonyms(input_text text)
   RETURNS text AS $$
   DECLARE
@@ -10,19 +13,96 @@
   BEGIN
     expanded := input_text;
     
-    -- Common Dutch product synonyms
+    -- Common Dutch product synonyms with their variations
     expanded := CASE
-      WHEN input_text ILIKE '%wc%papier%' THEN 'wc papier toilet papier toiletpapier'
-      WHEN input_text ILIKE '%toilet%papier%' THEN 'wc papier toilet papier toiletpapier'
-      WHEN input_text ILIKE '%wasmiddel%' THEN 'wasmiddel waspoeder wasgel'
-      WHEN input_text ILIKE '%waspoeder%' THEN 'wasmiddel waspoeder wasegel'
-      WHEN input_text ILIKE '%afwas%' THEN 'afwasmiddel vaatwas afwas'
-      WHEN input_text ILIKE '%vaatwas%' THEN 'afwasmiddel vaatwas afwas'
-      WHEN input_text ILIKE '%zeep%' THEN 'zeep handzeep douchegel'
-      WHEN input_text ILIKE '%chips%' THEN 'chips crisps'
-      WHEN input_text ILIKE '%frisdrank%' THEN 'frisdrank cola sinas fanta limonade'
-      WHEN input_text ILIKE '%groente%' THEN 'groente groenten'
-      WHEN input_text ILIKE '%aardappel%' THEN 'aardappel aardappelen pieper'
+      -- Toilet Paper & Cleaning
+      WHEN input_text ILIKE ANY(ARRAY['%wc%papier%', '%wc%rol%', '%wcpapier%', '%wc rol%', '%toilet%papier%']) 
+        THEN 'wc papier toilet papier toiletpapier wc rol wcpapier closetpapier wcrollen toiletrollen page edet lotus neutral tempo zewa'
+      WHEN input_text ILIKE ANY(ARRAY['%wasmiddel%', '%waspoeder%', '%wasgel%', '%wasverzachter%']) 
+        THEN 'wasmiddel waspoeder wasgel wasbol wasverzachter vloeibaar wasmiddel ariel persil omo robijn sunil lenor neutral biotex dreft ajax wasmiddelen wasproduct'
+      WHEN input_text ILIKE ANY(ARRAY['%vaatwas%', '%afwas%']) 
+        THEN 'afwasmiddel vaatwastabletten vaatwas tabletten vaatwasblokjes vaatwasgel dreft sun finish ajax ecover vaatwasreiniger vaatwascapsules afwasproduct'
+      
+      -- Personal Care
+      WHEN input_text ILIKE ANY(ARRAY['%zeep%', '%handzeep%', '%douchegel%', '%shampoo%']) 
+        THEN 'zeep handzeep douchegel doucheschuim handgel handsoap dove sanex nivea palmolive dettol rituals axe neutral zwitsal radox shampoo conditioner'
+      WHEN input_text ILIKE ANY(ARRAY['%tandpasta%', '%tandenborstel%']) 
+        THEN 'tandpasta tandenborstel mondwater oral-b colgate sensodyne parodontax elmex prodent aquafresh'
+      
+      -- Snacks & Chips
+      WHEN input_text ILIKE ANY(ARRAY['%chips%', '%crisp%', '%nachos%']) 
+        THEN 'chips crisps aardappelchips nachochips tortillachips lays pringles doritos bugles croky smiths tyrells jumbo chips ah chips lidl chips duyvis'
+      WHEN input_text ILIKE ANY(ARRAY['%noten%', '%pinda%', '%cashew%']) 
+        THEN 'noten pinda pindas cashew cashewnoten walnoten amandelen hazelnoten pistache pecannoten macadamia duyvis felix chio'
+      
+      -- Beverages
+      WHEN input_text ILIKE ANY(ARRAY['%frisdrank%', '%cola%', '%sinas%', '%fanta%', '%prik%', '%energy%']) 
+        THEN 'frisdrank cola sinas fanta limonade prik sprite coca cola pepsi fernandes red bull monster river lipton fuze tea 7up seven up mountain dew dr pepper royal club energy energiedrank'
+      WHEN input_text ILIKE ANY(ARRAY['%bier%', '%pils%', '%heineken%', '%grolsch%', '%hertog%']) 
+        THEN 'bier pils speciaalbier heineken grolsch hertog jan amstel bavaria jupiler corona leffe hoegaarden brand alfa warsteiner desperados palm duvel la chouffe weizen ipa alcoholvrij bier 0.0 radler'
+      WHEN input_text ILIKE ANY(ARRAY['%wijn%', '%cava%', '%prosecco%']) 
+        THEN 'wijn rode wijn witte wijn rose rosé cava prosecco champagne chardonnay merlot cabernet sauvignon pinot grigio sauvignon blanc'
+      
+      -- Dairy & Eggs
+      WHEN input_text ILIKE ANY(ARRAY['%melk%', '%karnemelk%', '%yoghurt%']) 
+        THEN 'melk halfvolle melk volle melk magere melk karnemelk lactosevrije melk sojamelk amandelmelk havermelk campina arla alpro oatly optimel friesche vlag milsani yoghurt kwark'
+      WHEN input_text ILIKE ANY(ARRAY['%kaas%', '%48+%', '%belegen%']) 
+        THEN 'kaas jong belegen oude kaas geitenkaas old amsterdam beemster milner leerdammer maaslander vergeer president boerenkaas 48+ 30+'
+      WHEN input_text ILIKE ANY(ARRAY['%eieren%', '%ei%']) 
+        THEN 'eieren scharrel scharreleieren vrije uitloop biologische eieren kipei eieren xl eieren m'
+      
+      -- Bread & Bakery
+      WHEN input_text ILIKE ANY(ARRAY['%brood%', '%boterham%']) 
+        THEN 'brood boterham boterhammen pistolet stokbrood afbakbrood tijgerbrood volkorenbrood witbrood bruinbrood waldkorn zonnebloem speltbrood'
+      WHEN input_text ILIKE ANY(ARRAY['%koek%', '%cake%', '%gebak%']) 
+        THEN 'koek cake gebak taart koekjes speculaas stroopwafel ontbijtkoek gevulde koek appeltaart appelgebak'
+      
+      -- Coffee & Tea
+      WHEN input_text ILIKE ANY(ARRAY['%koffie%', '%senseo%', '%nespresso%']) 
+        THEN 'koffie koffiebonen gemalen koffie koffiepads koffiecups capsules oploskoffie douwe egberts nespresso senseo lavazza illy nescafe starbucks peeze jacobs dolce gusto'
+      WHEN input_text ILIKE ANY(ARRAY['%thee%', '%tea%']) 
+        THEN 'thee theezakjes groene thee zwarte thee rooibos kruidenthee pickwick lipton twinings zonnatura pukka celestial yogi tea teekanne'
+      
+      -- Meat & Fish
+      WHEN input_text ILIKE ANY(ARRAY['%vlees%', '%gehakt%', '%worst%']) 
+        THEN 'vlees gehakt rundergehakt half om half gehakt kipfilet rundvlees varkensvlees worst braadworst rookworst'
+      WHEN input_text ILIKE ANY(ARRAY['%vis%', '%zalm%', '%tonijn%']) 
+        THEN 'vis zalm tonijn kabeljauw tilapia pangasius makreel haring gerookte zalm verse vis diepvries vis'
+      
+      -- Vegetables & Fruit
+      WHEN input_text ILIKE ANY(ARRAY['%groente%', '%groenten%']) 
+        THEN 'groente groenten verse groenten verse groente groentemix groentepakket gesneden groente voorgesneden groente sla tomaten komkommer paprika'
+      WHEN input_text ILIKE ANY(ARRAY['%fruit%', '%appel%', '%peer%', '%banaan%']) 
+        THEN 'fruit appel peer banaan sinaasappel mandarijn kiwi druiven aardbeien frambozen blauwe bessen'
+      WHEN input_text ILIKE ANY(ARRAY['%aardappel%', '%pieper%']) 
+        THEN 'aardappel aardappelen pieper piepers aardappeltjes krieltjes frietaardappelen bakaaardappelen kookaardappelen bildtstar doré nicola eigenheimer'
+      
+      -- Frozen Foods
+      WHEN input_text ILIKE ANY(ARRAY['%diepvries%', '%bevroren%']) 
+        THEN 'diepvries bevroren diepvriesgroenten diepvriesfruit diepvriesmaaltijd diepvriespizza diepvriessnacks iglo dr oetker mora beckers'
+      
+      -- Baby Products
+      WHEN input_text ILIKE ANY(ARRAY['%luier%', '%pamper%']) 
+        THEN 'luier luiers pamper pampers huggies kruidvat babyluiers zwemluiers'
+      WHEN input_text ILIKE ANY(ARRAY['%babyvoeding%', '%nutrilon%']) 
+        THEN 'babyvoeding nutrilon hero olvarit ella s kitchen nutricia'
+      
+      -- Pet Food
+      WHEN input_text ILIKE ANY(ARRAY['%hond%', '%hondenvoer%']) 
+        THEN 'hond hondenvoer hondenbrokken pedigree royal canin eukanuba rodi prins'
+      WHEN input_text ILIKE ANY(ARRAY['%kat%', '%kattenvoer%']) 
+        THEN 'kat kattenvoer kattenbrokken whiskas felix sheba purina one'
+      
+      -- Brands (map brands to their product categories)
+      WHEN input_text ILIKE ANY(ARRAY['%ariel%', '%persil%', '%omo%', '%robijn%']) 
+        THEN 'wasmiddel waspoeder wasgel ariel persil omo robijn'
+      WHEN input_text ILIKE ANY(ARRAY['%heineken%', '%grolsch%', '%amstel%', '%hertog%jan%']) 
+        THEN 'bier pils heineken grolsch amstel hertog jan'
+      WHEN input_text ILIKE ANY(ARRAY['%douwe%egberts%', '%de%koffie%', '%senseo%', '%nespresso%']) 
+        THEN 'koffie koffiebonen koffiepads douwe egberts senseo nespresso'
+      WHEN input_text ILIKE ANY(ARRAY['%unox%', '%knorr%', '%maggi%']) 
+        THEN 'soep saus bouillon unox knorr maggi'
+      
       ELSE input_text
     END;
     
@@ -72,7 +152,7 @@
         s.*,
         -- Prioritize exact product name matches, including expanded synonyms
         CASE 
-          WHEN LOWER(s.product_name) LIKE '%' || LOWER(query_text) || '%' THEN 1.0
+          WHEN LOWER(s.product_name) LIKE ANY(STRING_TO_ARRAY(LOWER(expanded_query), ' ')::text[]) THEN 1.0
           WHEN EXISTS (
             SELECT 1 
             FROM unnest(string_to_array(LOWER(expanded_query), ' ')) word
@@ -104,6 +184,7 @@
             SELECT 1 
             FROM unnest(string_to_array(LOWER(expanded_query), ' ')) word
             WHERE LOWER(s.product_name) LIKE '%' || word || '%'
+              OR LOWER(s.description) LIKE '%' || word || '%'
           )
           OR to_tsvector('dutch', s.product_name || ' ' || COALESCE(s.description, '')) @@ to_tsquery('dutch', regexp_replace(expanded_query, '\s+', ' & ', 'g'))
           OR (1 - (s.embedding <=> query_embedding)) > 0.8

@@ -1,5 +1,8 @@
 import { GroceryItem } from '@/types/grocery';
-import { productsService } from './products-service';
+import { productsService, type ProductWithSavings } from './products-service';
+import Fuse from 'fuse.js';
+import { expandDutchSearchTerms, getSynonymCategories } from '@/utils/dutch-product-synonyms';
+import { Category } from '@/constants/categories';
 
 interface SearchResult {
   groceryItem: GroceryItem;
@@ -32,6 +35,12 @@ interface SearchResult {
     reason: string;
     savingsPercentage: number;
   }>;
+}
+
+interface StoreData {
+  supermarket_data?: {
+    offerText?: string;
+  };
 }
 
 class HybridSearchService {
@@ -91,12 +100,68 @@ class HybridSearchService {
   }
 
   async searchSingleItem(searchTerm: string): Promise<SearchResult[]> {
-    // Search for products on sale that match the search term
-    const productsOnSale = await productsService.searchProductsOnSale(searchTerm);
+    // Expand search terms with Dutch synonyms
+    const expandedTerms = expandDutchSearchTerms(searchTerm);
+    const { category, subcategory } = getSynonymCategories(searchTerm);
+
+    // Search for products on sale that match any of the expanded terms
+    const searchPromises = expandedTerms.map(term => 
+      productsService.searchProductsOnSale(term)
+    );
+
+    const searchResults = await Promise.all(searchPromises);
+    const productsOnSale = searchResults.flat();
+
+    // If we have category/subcategory info from synonyms, search those as well
+    let categoryProducts: ProductWithSavings[] = [];
+    if (subcategory) {
+      categoryProducts = await productsService.findProductsOnSale(subcategory);
+    }
+
+    // Create a Fuse instance for fuzzy matching subcategories
+    const allSubcategories = await productsService.getAllSubcategories();
+    const fuseOptions = {
+      includeScore: true,
+      threshold: 0.4, // Lower threshold means stricter matching
+      keys: ['name']
+    };
+
+    interface SubcategoryItem {
+      name: string;
+    }
+
+    const fuse = new Fuse<SubcategoryItem>(
+      allSubcategories.map((s: string) => ({ name: s })), 
+      fuseOptions
+    );
+
+    // Get fuzzy matched subcategories (excluding the one we already searched)
+    const matchedSubcategories = fuse.search(searchTerm)
+      .map((result) => (result.item as SubcategoryItem).name)
+      .filter(subcat => subcat !== subcategory); // Exclude already searched subcategory
+
+    // Get products from matched subcategories
+    const subcategoryProducts = matchedSubcategories.length > 0 
+      ? await Promise.all(matchedSubcategories.map(subcat => 
+          productsService.findProductsOnSale(subcat)
+        )).then(results => results.flat())
+      : [];
+
+    // Combine all results
+    const combinedProducts = [
+      ...productsOnSale,
+      ...categoryProducts,
+      ...subcategoryProducts
+    ];
+
+    // Remove duplicates based on product ID
+    const uniqueProducts = Array.from(
+      new Map(combinedProducts.map(item => [item.id, item])).values()
+    );
 
     // Filter to only include products that have at least one store with an offer text
-    const filteredProducts = productsOnSale.filter(product => 
-      product.supermarkets.some(store => 
+    const filteredProducts = uniqueProducts.filter(product => 
+      product.supermarkets.some((store: StoreData) => 
         store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
       )
     );
@@ -104,7 +169,7 @@ class HybridSearchService {
     // Map products to recommendations format, only including stores with offer text
     const recommendations = filteredProducts.map(product => {
       // Get the first store with an offer text
-      const storeWithOffer = product.supermarkets.find(store => 
+      const storeWithOffer = product.supermarkets.find((store: StoreData) => 
         store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
       );
 
@@ -112,7 +177,7 @@ class HybridSearchService {
         saleItem: {
           id: product.id,
           productName: product.title,
-          supermarkets: product.supermarkets.filter(store => 
+          supermarkets: product.supermarkets.filter((store: StoreData) => 
             store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
           ),
           currentPrice: product.currentPrice,
@@ -126,17 +191,43 @@ class HybridSearchService {
           : `Aanbieding voor ${product.title}`,
         savingsPercentage: product.savingsPercentage
       };
-    }).filter(rec => rec.saleItem.supermarkets.length > 0); // Only include if there are stores with offer text
+    }).filter(rec => rec.saleItem.supermarkets.length > 0) // Only include if there are stores with offer text
+      .sort((a, b) => b.savingsPercentage - a.savingsPercentage); // Sort by highest savings first
 
     if (recommendations.length > 0) {
+      // Map synonym categories to app categories
+      const categoryMapping: Record<string, Category> = {
+        'Huishouden': 'Huishouden',
+        'Verzorging': 'Drogisterij',
+        'Tussendoor': 'Tussendoortjes',
+        'Dranken': 'Frisdrank en sappen',
+        'Groente & Fruit': 'Aardappel, groente en fruit',
+        'Brood & Banket': 'Broden, bakkerij en banket',
+        'Zuivel & Eieren': 'Zuivel, boter en eieren'
+      };
+
+      // Get emoji based on category
+      const getEmoji = (cat: string): string => {
+        switch (cat) {
+          case 'Huishouden': return '��';
+          case 'Verzorging': return '🧴';
+          case 'Tussendoor': return '🍪';
+          case 'Dranken': return '🥤';
+          case 'Groente & Fruit': return '🥬';
+          case 'Brood & Banket': return '🥖';
+          case 'Zuivel & Eieren': return '🥛';
+          default: return '🔍';
+        }
+      };
+
       return [{
         groceryItem: {
           id: 'search',
           name: searchTerm,
-          emoji: '🔍',
+          emoji: category ? getEmoji(category) : '🔍',
           completed: false,
-          category: 'Overig',
-          subcategory: '',
+          category: category ? (categoryMapping[category] || 'Overig') : 'Overig',
+          subcategory: subcategory || '',
           quantity: '',
           priority: false,
           household_id: '',
