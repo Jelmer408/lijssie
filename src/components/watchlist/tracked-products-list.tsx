@@ -1,29 +1,40 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, BellOff, Loader2, Package, Plus, Check, X } from 'lucide-react';
+import { BellOff, Loader2, Plus, Check, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { groceryService } from '@/services/grocery-service';
+import { Category } from '@/constants/categories';
+
+interface SupermarketData {
+  name: string;
+  price: string;
+  offerText?: string;
+  offerEndDate?: string;
+  pricePerUnit: string;
+}
+
+interface ProductData {
+  id: string;
+  title: string;
+  image_url: string | null;
+  quantity_info: string | null;
+  category: string | null;
+  subcategory: string | null;
+  supermarket_data?: SupermarketData[];
+}
+
+interface DatabaseProduct {
+  id: string;
+  created_at: string;
+  product: ProductData;
+}
 
 interface TrackedProduct {
   id: string;
-  product: {
-    id: string;
-    title: string;
-    image_url: string | null;
-    quantity_info: string | null;
-    category: string | null;
-    subcategory: string | null;
-    supermarket_data?: {
-      name: string;
-      price: string;
-      offerText?: string;
-      offerEndDate?: string;
-      pricePerUnit: string;
-    }[];
-  };
   created_at: string;
-  sale_info?: {
+  product: ProductData;
+  sale_info: {
     supermarket: string;
     currentPrice: string;
     originalPrice?: string;
@@ -32,14 +43,8 @@ interface TrackedProduct {
     savingsPercentage?: number;
     isRegularPrice?: boolean;
     offerText?: string;
-    supermarket_data: {
-      name: string;
-      price: string;
-      offerText?: string;
-      offerEndDate?: string;
-      pricePerUnit: string;
-    };
-  };
+    supermarket_data: SupermarketData;
+  } | null;
 }
 
 interface TrackedProductsListProps {
@@ -106,10 +111,12 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
       if (error) throw error;
 
       // Process products and their sale information
-      const productsWithSales = (data || []).map((item) => {
+      const productsWithSales = ((data as unknown) as DatabaseProduct[]).map((item: DatabaseProduct) => {
         // Initialize the base product without sales
-        const baseProduct = {
-          ...item,
+        const baseProduct: TrackedProduct = {
+          id: item.id,
+          created_at: item.created_at,
+          product: item.product,
           sale_info: null
         };
 
@@ -119,7 +126,7 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
         }
 
         // Find sales with actual offers
-        const salesWithOffers = item.product.supermarket_data.filter(store => 
+        const salesWithOffers = item.product.supermarket_data.filter((store: SupermarketData) => 
           store?.offerText && 
           store.offerText.trim() !== '' &&
           store?.price
@@ -131,7 +138,7 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
         }
 
         // Find the best sale (lowest price) among offers
-        const bestSale = salesWithOffers.reduce((best, current) => {
+        const bestSale = salesWithOffers.reduce((best: SupermarketData, current: SupermarketData) => {
           const currentPrice = parseFloat(current.price.replace('€', '').trim());
           const bestPrice = best ? parseFloat(best.price.replace('€', '').trim()) : Infinity;
           return currentPrice < bestPrice ? current : best;
@@ -140,7 +147,7 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
         // If we found a valid sale, return the product with sale info
         if (bestSale) {
           return {
-            ...item,
+            ...baseProduct,
             sale_info: {
               supermarket: bestSale.name,
               currentPrice: bestSale.price.replace('€', '').trim(),
@@ -202,7 +209,7 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
         completed: false,
         priority: false,
         product_id: item.product.id,
-        category: item.product.category || 'Overig',
+        category: (item.product.category || 'Overig') as Category,
         subcategory: item.product.subcategory || '',
         quantity: '1',
         unit: 'st'
