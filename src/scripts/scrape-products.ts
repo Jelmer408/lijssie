@@ -2,7 +2,7 @@ import puppeteer from 'puppeteer';
 import fs from "fs"
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-import { allSubCategoriesProducts } from './allSubCategoriesProducts.js';
+import { allSubCategoriesProducts } from '../scripts/allSubCategoriesProducts.js';
 
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
