@@ -3,8 +3,18 @@ CREATE TABLE product_watchlist (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
     household_id UUID REFERENCES households(id) ON DELETE CASCADE,
+    search_term TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    -- Ensure either product_id or search_term is provided, but not both
+    CONSTRAINT product_watchlist_product_or_search_term_check CHECK (
+        (product_id IS NOT NULL AND search_term IS NULL) OR
+        (product_id IS NULL AND search_term IS NOT NULL)
+    ),
+    -- Prevent duplicate product tracking per household
+    CONSTRAINT product_watchlist_household_product_unique UNIQUE (household_id, product_id),
+    -- Prevent duplicate search term tracking per household
+    CONSTRAINT product_watchlist_household_search_term_unique UNIQUE (household_id, search_term)
 );
 
 -- Add a unique constraint to prevent duplicate products in a household

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BellOff, Loader2, Plus, Check, X } from 'lucide-react';
+import { BellOff, Loader2, Plus, Check, X, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { groceryService } from '@/services/grocery-service';
@@ -27,13 +27,15 @@ interface ProductData {
 interface DatabaseProduct {
   id: string;
   created_at: string;
-  product: ProductData;
+  product?: ProductData;
+  search_term?: string | null;
 }
 
 interface TrackedProduct {
   id: string;
   created_at: string;
-  product: ProductData;
+  product?: ProductData;
+  search_term?: string;
   sale_info: {
     supermarket: string;
     currentPrice: string;
@@ -95,6 +97,7 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
         .select(`
           id,
           created_at,
+          search_term,
           product:products (
             id,
             title,
@@ -117,16 +120,22 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
           id: item.id,
           created_at: item.created_at,
           product: item.product,
+          search_term: item.search_term ? item.search_term : undefined,
           sale_info: null
         };
 
+        // If it's a search term tracking, return as is
+        if (item.search_term) {
+          return baseProduct;
+        }
+
         // Check if product has supermarket data with offers
-        if (!item.product.supermarket_data || !Array.isArray(item.product.supermarket_data)) {
+        if (!item.product?.supermarket_data || !Array.isArray(item.product.supermarket_data)) {
           return baseProduct;
         }
 
         // Find sales with actual offers
-        const salesWithOffers = item.product.supermarket_data.filter((store: SupermarketData) => 
+        const salesWithOffers = item.product?.supermarket_data.filter((store: SupermarketData) => 
           store?.offerText && 
           store.offerText.trim() !== '' &&
           store?.price
@@ -203,14 +212,14 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
 
       // Create a new grocery item
       const newGroceryItem = {
-        name: item.product.title,
+        name: item.product?.title,
         emoji: '🛍️',
         household_id: householdId,
         completed: false,
         priority: false,
-        product_id: item.product.id,
-        category: (item.product.category || 'Overig') as Category,
-        subcategory: item.product.subcategory || '',
+        product_id: item.product?.id,
+        category: (item.product?.category || 'Overig') as Category,
+        subcategory: item.product?.subcategory || '',
         quantity: '1',
         unit: 'st'
       };
@@ -334,7 +343,11 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                 className="bg-white rounded-2xl border border-gray-200/50 shadow-sm p-2.5"
               >
                 <div className="flex items-center gap-2">
-                  {item.product.image_url && (
+                  {item.search_term ? (
+                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 flex-shrink-0">
+                      <Search className="w-5 h-5 text-blue-500" />
+                    </div>
+                  ) : item.product?.image_url ? (
                     <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white">
                       <img
                         src={item.product.image_url}
@@ -342,10 +355,10 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                         className="w-full h-full object-contain"
                       />
                     </div>
-                  )}
+                  ) : null}
                   <div className="flex-1 min-w-0 py-0.5">
                     <h3 className="font-medium text-[13px] text-gray-900 leading-tight mb-1">
-                      {item.product.title}
+                      {item.search_term ? `Zoekterm: "${item.search_term}"` : item.product?.title}
                     </h3>
                     
                     {/* Sale Information */}
@@ -372,46 +385,48 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                       </div>
                     ) : (
                       <span className="text-[11px] text-gray-500">
-                        Nog niet in de aanbieding
+                        {item.search_term ? 'Zoekterm wordt getrackt' : 'Nog niet in de aanbieding'}
                       </span>
                     )}
                   </div>
                   
                   <div className="flex items-center self-center gap-1.5">
-                    <button
-                      onClick={() => handleAddToGroceryList(item)}
-                      disabled={isAddingItem.has(`tracked-${item.id}`)}
-                      className={cn(
-                        "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
-                        isAddingItem.has(`tracked-${item.id}`)
-                          ? "bg-gray-100 text-gray-400"
-                          : addedItems.has(`tracked-${item.id}`)
-                          ? "bg-green-100 hover:bg-green-200 text-green-700"
-                          : "bg-blue-50 hover:bg-blue-100 text-blue-600"
-                      )}
-                    >
-                      <AnimatePresence mode="wait">
-                        {isAddingItem.has(`tracked-${item.id}`) ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : addedItems.has(`tracked-${item.id}`) ? (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
-                          >
-                            <Check className="w-4 h-4" />
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
-                          >
-                            <Plus className="w-4 h-4" />
-                          </motion.div>
+                    {!item.search_term && item.product && (
+                      <button
+                        onClick={() => handleAddToGroceryList(item)}
+                        disabled={isAddingItem.has(`tracked-${item.id}`)}
+                        className={cn(
+                          "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
+                          isAddingItem.has(`tracked-${item.id}`)
+                            ? "bg-gray-100 text-gray-400"
+                            : addedItems.has(`tracked-${item.id}`)
+                            ? "bg-green-100 hover:bg-green-200 text-green-700"
+                            : "bg-blue-50 hover:bg-blue-100 text-blue-600"
                         )}
-                      </AnimatePresence>
-                    </button>
+                      >
+                        <AnimatePresence mode="wait">
+                          {isAddingItem.has(`tracked-${item.id}`) ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : addedItems.has(`tracked-${item.id}`) ? (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              exit={{ scale: 0 }}
+                            >
+                              <Check className="w-4 h-4" />
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              exit={{ scale: 0 }}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </button>
+                    )}
                     
                     <button
                       onClick={() => handleUntrack(item.id)}
