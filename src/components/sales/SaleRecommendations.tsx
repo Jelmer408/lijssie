@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GroceryItem } from '@/types/grocery';
-import { Loader2, ChevronDown, ArrowRightLeft, Check, Search, X, MessageSquareWarning, Plus, Package, Bell } from 'lucide-react';
+import { Loader2, ChevronDown, ArrowRightLeft, Check, Search, X, MessageSquareWarning, Plus, Package, Bell, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { hybridSearchService } from '@/services/hybrid-search-service';
@@ -86,7 +86,7 @@ interface SupermarketStore {
   savingsPercentage: number;
   isRegularPrice?: boolean;
   offerText?: string;
-  supermarket_data: {
+  supermarket_data?: {
     name: string;
     price: string;
     offerText?: string;
@@ -136,6 +136,7 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [switchingItems, setSwitchingItems] = useState<Set<string>>(new Set());
   const [switchedItems, setSwitchedItems] = useState<Set<string>>(new Set());
+  const [showOnlySales, setShowOnlySales] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -146,6 +147,8 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   const [showWatchlistSearch, setShowWatchlistSearch] = useState(false);
   const [currentHouseholdId, setCurrentHouseholdId] = useState<string | undefined>();
   const [isTrackingSearch, setIsTrackingSearch] = useState(false);
+  const [visibleSearchResults, setVisibleSearchResults] = useState<number>(5);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Check welcome message status
   useEffect(() => {
@@ -231,63 +234,78 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
     fetchRecommendations();
   }, [groceryList]);
 
-  // Add debounced search function
+  // Add debounced search function with sale filter
   const [debouncedSearch] = useState(() => {
     let timeout: NodeJS.Timeout;
-    return (query: string) => {
+    return (query: string, onlySales: boolean) => {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         if (query.trim()) {
-          handleSearch(query);
+          handleSearch(query, onlySales);
         } else {
           setSearchResults([]);
         }
-      }, 500); // Wait 500ms after user stops typing
+      }, 500);
     };
   });
 
-  const filterRecommendationsByFuzzyMatch = (groceryItemName: string, recommendations: Array<any>) => {
+  const filterRecommendationsByFuzzyMatch = (groceryItemName: string, recommendations: Array<any>, onlySales: boolean) => {
+    console.log('filterRecommendationsByFuzzyMatch called with:', { groceryItemName, onlySales, recommendationsCount: recommendations?.length });
+    
     // First, ensure we have recommendations to work with
     if (!recommendations || recommendations.length === 0) {
       return [];
     }
 
-    // 1. Get all products that have offer text in supermarket_data
-    const productsOnSale = recommendations.filter(rec => {
-      // Check if any supermarket has an offer text
-      const hasActiveSale = rec.saleItem.supermarkets?.some((value: { supermarket_data?: { offerText?: string } }) => 
-        value.supermarket_data?.offerText && value.supermarket_data.offerText !== ''
-      );
-
-      // Only include if there's an active sale with offer text
-      return hasActiveSale;
-    });
-
-    // 2. If we have no products on sale, return empty array
-    if (productsOnSale.length === 0) {
-      return [];
-    }
-
-    // 3. Use basic Fuse.js for sorting purposes only
+    // Use Fuse.js for fuzzy matching first
     const fuseOptions = {
       includeScore: true,
       threshold: 0.9,
       keys: ['saleItem.productName']
     };
 
-    const fuse = new Fuse(productsOnSale, fuseOptions);
-    const results = fuse.search(groceryItemName);
+    const fuse = new Fuse(recommendations, fuseOptions);
+    const fuzzyResults = fuse.search(groceryItemName);
+    console.log('Fuzzy search results:', fuzzyResults.length);
 
-    // 4. Return only fuzzy matches that are on sale
-    return results.map(result => ({
-      ...result.item,
+    // Process each result
+    const processedResults = fuzzyResults.map(result => {
+      const item = result.item;
+      const supermarkets = item.saleItem.supermarkets || [];
+
+      // When onlySales is false, include all supermarkets
+      if (!onlySales) {
+        return {
+          ...item,
       saleItem: {
-        ...result.item.saleItem,
-        supermarkets: result.item.saleItem.supermarkets?.filter((value: { supermarket_data?: { offerText?: string } }) =>
-          value.supermarket_data?.offerText && value.supermarket_data.offerText !== ''
-        )
+            ...item.saleItem,
+            supermarkets: supermarkets.map((store: SupermarketStore) => ({
+              ...store,
+              isRegularPrice: !store.supermarket_data?.offerText
+            }))
+          }
+        };
       }
-    }));
+
+      // For sales mode, only include supermarkets with active sales
+      const salesSupermarkets = supermarkets.filter((store: SupermarketStore) => 
+        store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+      );
+
+      if (salesSupermarkets.length === 0) return null;
+
+      return {
+        ...item,
+        saleItem: {
+          ...item.saleItem,
+          supermarkets: salesSupermarkets
+        }
+      };
+    });
+
+    const filteredResults = processedResults.filter(Boolean);
+    console.log('Final filtered results:', filteredResults.length);
+    return filteredResults;
   };
 
   const handleCloseWelcome = () => {
@@ -339,7 +357,8 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
     }
   };
 
-  const handleSearch = async (query: string) => {
+  const handleSearch = async (query: string, onlySales: boolean) => {
+    console.log('handleSearch called with:', { query, onlySales });
     if (!query.trim()) {
       setSearchResults([]);
       return;
@@ -347,30 +366,21 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
 
     setIsSearching(true);
     try {
-      const results = await hybridSearchService.searchSingleItem(query);
+      console.log('Fetching results from hybridSearchService...');
+      const results = await hybridSearchService.searchSingleItem(query, onlySales);
+      console.log('Search results:', results);
+      
       if (results.length > 0) {
-        // Filter to only include items with offer text
-        const saleResults = results[0].recommendations.filter(item => 
-          item.saleItem.supermarkets?.some(store => 
-            store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
-          )
-        ).map(item => ({
-          ...item,
-          saleItem: {
-            ...item.saleItem,
-            supermarkets: item.saleItem.supermarkets?.filter((value: { supermarket_data?: { offerText?: string } }) =>
-              value.supermarket_data?.offerText && value.supermarket_data.offerText !== ''
-            )
-          }
-        }));
-        
-        // Apply fuzzy matching to filtered results
-        const filteredResults = filterRecommendationsByFuzzyMatch(
+        console.log('Filtering results with onlySales:', onlySales);
+        const filteredMatches = filterRecommendationsByFuzzyMatch(
           query,
-          saleResults
+          results[0].recommendations,
+          onlySales
         );
+        console.log('Filtered matches:', filteredMatches);
         
-        setSearchResults(filteredResults);
+        setSearchResults(filteredMatches);
+        setVisibleSearchResults(5);
       } else {
         setSearchResults([]);
       }
@@ -612,6 +622,13 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
     }
   }
 
+  const handleLoadMore = () => {
+    setIsLoadingMore(true);
+    // Add 10 more items to the visible results
+    setVisibleSearchResults(prev => prev + 10);
+    setIsLoadingMore(false);
+  };
+
   return (
     <>
       <AnimatePresence>
@@ -699,31 +716,30 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                debouncedSearch(e.target.value);
+                debouncedSearch(e.target.value, showOnlySales);
               }}
               placeholder="Zoek in alle aanbiedingen..."
-              className="w-full pl-12 pr-12 py-3.5 bg-white/80 hover:bg-white/90 focus:bg-white backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-sm text-[15px] text-gray-900 placeholder-gray-500 outline-none ring-0 focus:ring-2 ring-offset-0 ring-blue-500/20 transition-all duration-300"
+              className="w-full pl-12 pr-24 py-3.5 bg-white/80 hover:bg-white/90 focus:bg-white backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-sm text-[15px] text-gray-900 placeholder-gray-500 outline-none ring-0 focus:ring-2 ring-offset-0 ring-blue-500/20 transition-all duration-300"
             />
             {searchQuery && (
               <div className="absolute inset-y-0 right-4 flex items-center gap-2">
-                {/* Track Search Term Button */}
+                {/* Sale Filter Toggle */}
                 <button
-                  onClick={() => handleTrackSearchTerm(searchQuery)}
-                  disabled={isTrackingSearch}
+                  onClick={async () => {
+                    const newShowOnlySales = !showOnlySales;
+                    setShowOnlySales(newShowOnlySales);
+                    await handleSearch(searchQuery, newShowOnlySales);
+                  }}
                   className={cn(
-                    "p-1.5 rounded-full transition-colors duration-200",
-                    isTrackingSearch
-                      ? "bg-gray-100 text-gray-400"
-                      : "hover:bg-blue-50 text-blue-500 hover:text-blue-600"
+                    "flex items-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-colors duration-200",
+                    showOnlySales
+                      ? "bg-green-50 text-green-600 hover:bg-green-100"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   )}
                 >
-                  {isTrackingSearch ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Bell className="h-4 w-4" />
-                  )}
+                  <Tag className="h-3.5 w-3.5" />
+                  {showOnlySales ? "Aanbiedingen" : "Alle producten"}
                 </button>
-
                 {/* Clear Search Button */}
                 <button
                   onClick={() => {
@@ -798,89 +814,98 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                     </div>
                   </motion.div>
                 )}
-                {searchResults.map((result, index) => (
+                {searchResults.slice(0, visibleSearchResults).map((result, index) => (
                   <motion.div
-                    key={`search-${result.saleItem.id}-${index}`}
+                    key={`search-${result.saleItem.id}`}
                     initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200/50 shadow-sm p-3"
+                    animate={{ opacity: 1, y: 0, transition: { delay: index * 0.05 } }}
+                    className="bg-white rounded-xl border border-gray-200/50 shadow-sm p-2"
                   >
-                    <div className="flex items-start gap-2.5 p-2.5">
+                    <div className="flex items-start gap-2">
                       {result.saleItem.imageUrl && (
-                        <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100/50">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-white border border-gray-100">
                           <img
                             src={result.saleItem.imageUrl}
                             alt={result.saleItem.productName}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain bg-white"
                           />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-[13px] text-gray-900 leading-tight mb-1.5">
+                        <h3 className="font-medium text-[13px] text-gray-900 leading-tight">
                           {result.saleItem.productName}
-                        </h4>
-                        
-                        <div className="space-y-1">
-                          {result.saleItem.supermarkets?.map((store: SupermarketStore) => (
-                            <div key={store.name} className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1.5 px-2">
+                        </h3>
+
+                        {result.saleItem.supermarkets && result.saleItem.supermarkets.length > 0 && (
+                          <>
+                            {(() => {
+                              const cheapestStore = result.saleItem.supermarkets.reduce((prev: SupermarketStore, curr: SupermarketStore) => {
+                                const prevPrice = parseFloat(prev.currentPrice);
+                                const currPrice = parseFloat(curr.currentPrice);
+                                return currPrice < prevPrice ? curr : prev;
+                              }, result.saleItem.supermarkets[0]);
+
+                              return (
+                                <div className="mt-1">
+                                  <div className="flex items-center justify-between">
+                                    <div 
+                                      className="flex-1 flex items-center justify-between bg-gray-50/80 rounded-lg py-1 px-2 cursor-pointer hover:bg-gray-100/80 transition-colors"
+                                      onClick={() => toggleExpanded(`search-${result.saleItem.id}`)}
+                                    >
                               <div className="flex items-center gap-2">
                                 <img
-                                  src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
-                                  alt={store.name}
+                                          src={`/supermarkets/${cheapestStore.name.toLowerCase()}-logo.png`}
+                                          alt={cheapestStore.name}
                                   className="w-4 h-4 object-contain"
                                 />
                                 <div className="flex items-baseline gap-1.5">
-                                  <span className={cn(
-                                    "font-medium text-[13px]",
-                                    store.isRegularPrice ? "text-gray-900" : "text-green-700"
-                                  )}>
-                                    €{store.currentPrice}
+                                          <span className="text-[11px] font-medium text-gray-600">
+                                            {cheapestStore.name}
                                   </span>
-                                  {store.isRegularPrice ? (
-                                    <span className="text-[11px] text-gray-600 font-medium">
-                                      Reguliere prijs
+                                          <span className="font-medium text-[13px] text-green-700">
+                                            €{cheapestStore.currentPrice}
                                     </span>
-                                  ) : store.supermarket_data?.offerText && (
+                                          {cheapestStore.supermarket_data?.offerText && (
                                     <span className="text-[11px] text-green-600 font-medium">
-                                      {store.supermarket_data.offerText}
+                                              {cheapestStore.supermarket_data.offerText}
                                     </span>
                                   )}
                                 </div>
+                                      </div>
+                                      {result.saleItem.supermarkets.length > 1 && (
+                                        <motion.div
+                                          animate={{ rotate: expandedItems.has(`search-${result.saleItem.id}`) ? 180 : 0 }}
+                                          transition={{ duration: 0.2 }}
+                                        >
+                                          <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                                        </motion.div>
+                                      )}
                               </div>
                               
-                              <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5 ml-2">
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAddToWatchlist(result.saleItem.id);
-                                  }}
-                                  className={cn(
-                                    "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
-                                    "bg-blue-50 hover:bg-blue-100 text-blue-600"
-                                  )}
+                                        onClick={() => handleAddToWatchlist(result.saleItem.id)}
+                                        className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
                                 >
                                   <Bell className="w-4 h-4" />
                                 </button>
+
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAddToGroceryList(result.saleItem, store);
-                                  }}
-                                  disabled={isAddingItem.has(`search-${result.saleItem.id}-${store.name}`)}
+                                        onClick={() => handleAddToGroceryList(result.saleItem, result.saleItem.supermarkets?.[0] || cheapestStore)}
+                                        disabled={isAddingItem.has(`search-${result.saleItem.id}`)}
                                   className={cn(
                                     "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
-                                    isAddingItem.has(`search-${result.saleItem.id}-${store.name}`)
+                                          isAddingItem.has(`search-${result.saleItem.id}`)
                                       ? "bg-gray-100 text-gray-400"
-                                      : addedItems.has(`search-${result.saleItem.id}-${store.name}`)
+                                            : addedItems.has(`search-${result.saleItem.id}`)
                                       ? "bg-green-100 hover:bg-green-200 text-green-700"
                                       : "bg-blue-50 hover:bg-blue-100 text-blue-600"
                                   )}
                                 >
                                   <AnimatePresence mode="wait">
-                                    {isAddingItem.has(`search-${result.saleItem.id}-${store.name}`) ? (
+                                          {isAddingItem.has(`search-${result.saleItem.id}`) ? (
                                       <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : addedItems.has(`search-${result.saleItem.id}-${store.name}`) ? (
+                                          ) : addedItems.has(`search-${result.saleItem.id}`) ? (
                                       <motion.div
                                         initial={{ scale: 0 }}
                                         animate={{ scale: 1 }}
@@ -899,15 +924,86 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                                     )}
                                   </AnimatePresence>
                                 </button>
+                                    </div>
+                                  </div>
+
+                                  <AnimatePresence>
+                                    {expandedItems.has(`search-${result.saleItem.id}`) && (
+                                      <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="space-y-1 mt-1 overflow-hidden"
+                                      >
+                                        {result.saleItem.supermarkets
+                                          .filter((store: SupermarketStore) => store.name !== cheapestStore.name)
+                                          .map((store: SupermarketStore) => (
+                                            <div
+                                              key={`${result.saleItem.id}-${store.name}`}
+                                              className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1 px-2"
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <img
+                                                  src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
+                                                  alt={store.name}
+                                                  className="w-4 h-4 object-contain"
+                                                />
+                                                <div className="flex items-baseline gap-1.5">
+                                                  <span className="text-[11px] font-medium text-gray-600">
+                                                    {store.name}
+                                                  </span>
+                                                  <span className="font-medium text-[13px] text-gray-700">
+                                                    €{store.currentPrice}
+                                                  </span>
+                                                  {store.supermarket_data?.offerText && (
+                                                    <span className="text-[11px] text-green-600 font-medium">
+                                                      {store.supermarket_data.offerText}
+                                                    </span>
+                                                  )}
+                                                </div>
                               </div>
                             </div>
                           ))}
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
                         </div>
+                              );
+                            })()}
+                          </>
+                        )}
                       </div>
                     </div>
                   </motion.div>
                 ))}
               </AnimatePresence>
+
+              {/* Load More Button */}
+              {searchResults.length > visibleSearchResults && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="pt-2"
+                >
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={isLoadingMore}
+                    className="w-full py-2 px-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl border border-blue-500/10 shadow-sm transition-all duration-200 flex items-center justify-center gap-2"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Laden...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4" />
+                        <span>Laad meer</span>
+                      </>
+                    )}
+                  </button>
+                </motion.div>
+              )}
             </div>
           </div>
         )}
@@ -1061,8 +1157,110 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                             </h4>
                             
                             <div className="space-y-1">
-                              {rec.saleItem.supermarkets?.map((store: SupermarketStore) => (
-                                <div key={store.name} className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1.5 px-2">
+                              {(() => {
+                                // Find the cheapest store
+                                const cheapestStore = rec.saleItem.supermarkets.reduce((prev: SupermarketStore, curr: SupermarketStore) => {
+                                  const prevPrice = parseFloat(prev.currentPrice);
+                                  const currPrice = parseFloat(curr.currentPrice);
+                                  return currPrice < prevPrice ? curr : prev;
+                                }, rec.saleItem.supermarkets[0]);
+
+                                return (
+                                  <>
+                                    <div className="flex items-center justify-between">
+                                      <div 
+                                        className="flex-1 flex items-center justify-between bg-gray-50/80 rounded-lg py-1.5 px-2 cursor-pointer hover:bg-gray-100/80 transition-colors"
+                                        onClick={() => toggleExpanded(`${itemId}-${rec.saleItem.id}`)}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <img
+                                            src={`/supermarkets/${cheapestStore.name.toLowerCase()}-logo.png`}
+                                            alt={cheapestStore.name}
+                                            className="w-4 h-4 object-contain"
+                                          />
+                                          <div className="flex items-baseline gap-1.5">
+                                            <span className="text-[11px] font-medium text-gray-600">
+                                              {cheapestStore.name}
+                                            </span>
+                                            <span className="font-medium text-[13px] text-green-700">
+                                              €{cheapestStore.currentPrice}
+                                            </span>
+                                            {cheapestStore.supermarket_data?.offerText && (
+                                              <span className="text-[11px] text-green-600 font-medium">
+                                                {cheapestStore.supermarket_data.offerText}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {rec.saleItem.supermarkets.length > 1 && (
+                                          <motion.div
+                                            animate={{ rotate: expandedItems.has(`${itemId}-${rec.saleItem.id}`) ? 180 : 0 }}
+                                            transition={{ duration: 0.2 }}
+                                          >
+                                            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                                          </motion.div>
+                                        )}
+                                      </div>
+                                      
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleSwitch(group.groceryItem, rec.saleItem, cheapestStore);
+                                        }}
+                                        disabled={switchingItems.has(`${itemId}-${rec.saleItem.id}-${cheapestStore.name}`)}
+                                        className={cn(
+                                          "group relative flex h-6 ml-2 px-2 items-center justify-center rounded-md text-[11px] font-medium transition-all duration-200",
+                                          switchedItems.has(`${itemId}-${rec.saleItem.id}-${cheapestStore.name}`)
+                                            ? "bg-green-100 hover:bg-green-200 text-green-700"
+                                            : cheapestStore.isRegularPrice
+                                              ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                                              : "bg-blue-50 hover:bg-blue-100 text-blue-700"
+                                        )}
+                                      >
+                                        <AnimatePresence mode="wait">
+                                          {switchingItems.has(`${itemId}-${rec.saleItem.id}-${cheapestStore.name}`) ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                          ) : switchedItems.has(`${itemId}-${rec.saleItem.id}-${cheapestStore.name}`) ? (
+                                            <motion.div
+                                              initial={{ scale: 0 }}
+                                              animate={{ scale: 1 }}
+                                              exit={{ scale: 0 }}
+                                              className="flex items-center gap-1"
+                                            >
+                                              <Check className="h-3 w-3" />
+                                              <span>OK</span>
+                                            </motion.div>
+                                          ) : (
+                                            <motion.div
+                                              initial={{ scale: 0 }}
+                                              animate={{ scale: 1 }}
+                                              exit={{ scale: 0 }}
+                                              className="flex items-center gap-1"
+                                            >
+                                              <ArrowRightLeft className="h-3 w-3" />
+                                              <span>Wissel</span>
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
+                                      </button>
+                                    </div>
+
+                                    <AnimatePresence>
+                                      {expandedItems.has(`${itemId}-${rec.saleItem.id}`) && (
+                                        <motion.div
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{ height: "auto", opacity: 1 }}
+                                          exit={{ height: 0, opacity: 0 }}
+                                          transition={{ duration: 0.2 }}
+                                          className="space-y-1 mt-1 overflow-hidden"
+                                        >
+                                          {rec.saleItem.supermarkets
+                                            .filter((store: SupermarketStore) => store.name !== cheapestStore.name)
+                                            .map((store: SupermarketStore) => (
+                                              <div
+                                                key={`${rec.saleItem.id}-${store.name}`}
+                                                className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1.5 px-2"
+                                              >
                                   <div className="flex items-center gap-2">
                                     <img
                                       src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
@@ -1070,17 +1268,13 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                                       className="w-4 h-4 object-contain"
                                     />
                                     <div className="flex items-baseline gap-1.5">
-                                      <span className={cn(
-                                        "font-medium text-[13px]",
-                                        store.isRegularPrice ? "text-gray-900" : "text-green-700"
-                                      )}>
+                                                    <span className="text-[11px] font-medium text-gray-600">
+                                                      {store.name}
+                                                    </span>
+                                                    <span className="font-medium text-[13px] text-gray-700">
                                         €{store.currentPrice}
                                       </span>
-                                      {store.isRegularPrice ? (
-                                        <span className="text-[11px] text-gray-600 font-medium">
-                                          Reguliere prijs
-                                        </span>
-                                      ) : store.supermarket_data?.offerText && (
+                                                    {store.supermarket_data?.offerText && (
                                         <span className="text-[11px] text-green-600 font-medium">
                                           {store.supermarket_data.offerText}
                                         </span>
@@ -1131,6 +1325,12 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                                   </button>
                                 </div>
                               ))}
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         </motion.div>

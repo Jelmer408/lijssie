@@ -403,17 +403,7 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                 exit={{ opacity: 0, y: -10 }}
                 className="bg-white rounded-2xl border border-gray-200/50 shadow-sm p-2.5"
               >
-                <div 
-                  className={cn(
-                    "flex items-center gap-2",
-                    (item.search_matches?.length ?? 0) > 0 && "cursor-pointer"
-                  )}
-                  onClick={() => {
-                    if (item.search_matches?.length) {
-                      toggleExpanded(item.id);
-                    }
-                  }}
-                >
+                <div className="flex items-start gap-2">
                   {item.search_term ? (
                     <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 flex-shrink-0">
                       <Search className="w-5 h-5 text-blue-500" />
@@ -427,32 +417,178 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                       />
                     </div>
                   ) : null}
-                  <div className="flex-1 min-w-0 py-0.5">
-                    <h3 className="font-medium text-[13px] text-gray-900 leading-tight mb-1">
-                      {item.search_term ? `Zoekterm: "${item.search_term}"` : item.product?.title}
-                    </h3>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-1">
+                      <h3 className="font-medium text-[13px] text-gray-900 leading-tight">
+                        {item.search_term ? `Zoekterm: "${item.search_term}"` : item.product?.title}
+                      </h3>
+                      
+                      <div className="flex items-center gap-1.5 ml-2">
+                        {!item.search_term && item.product && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToGroceryList(item);
+                            }}
+                            disabled={isAddingItem.has(`tracked-${item.id}`)}
+                            className={cn(
+                              "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
+                              isAddingItem.has(`tracked-${item.id}`)
+                                ? "bg-gray-100 text-gray-400"
+                                : addedItems.has(`tracked-${item.id}`)
+                                ? "bg-green-100 hover:bg-green-200 text-green-700"
+                                : "bg-blue-50 hover:bg-blue-100 text-blue-600"
+                            )}
+                          >
+                            <AnimatePresence mode="wait">
+                              {isAddingItem.has(`tracked-${item.id}`) ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : addedItems.has(`tracked-${item.id}`) ? (
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  exit={{ scale: 0 }}
+                                >
+                                  <Check className="w-4 h-4" />
+                                </motion.div>
+                              ) : (
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  exit={{ scale: 0 }}
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </button>
+                        )}
+                        
+                        {item.search_term && item.search_matches?.length ? (
+                          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <motion.div
+                              animate={{ rotate: expandedItems.has(item.id) ? 180 : 0 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <ChevronDown className="h-4 w-4 text-gray-400" />
+                            </motion.div>
+                          </div>
+                        ) : null}
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUntrack(item.id);
+                          }}
+                          disabled={deletingProducts.has(item.id)}
+                          className={cn(
+                            "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
+                            deletingProducts.has(item.id)
+                              ? "bg-gray-100 text-gray-400"
+                              : "bg-red-50 hover:bg-red-100 text-red-600"
+                          )}
+                        >
+                          <AnimatePresence mode="wait">
+                            {deletingProducts.has(item.id) ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                exit={{ scale: 0 }}
+                              >
+                                <X className="w-4 h-4" />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </button>
+                      </div>
+                    </div>
                     
                     {/* Sale Information */}
                     {item.sale_info ? (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                          <img
-                            src={`/supermarkets/${item.sale_info.supermarket.toLowerCase()}-logo.png`}
-                            alt={item.sale_info.supermarket}
-                            className="w-4 h-4 object-contain"
-                          />
-                          <span className="font-medium text-[13px] text-green-700">
-                            €{item.sale_info.currentPrice}
-                          </span>
-                          <span className="text-[11px] text-green-600 font-medium">
-                            {item.sale_info.offerText}
-                          </span>
+                      <div className="flex-1 min-w-0">
+                        <div 
+                          className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1 px-2 cursor-pointer hover:bg-gray-100/80 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpanded(`price-${item.id}`);
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={`/supermarkets/${item.sale_info.supermarket.toLowerCase()}-logo.png`}
+                              alt={item.sale_info.supermarket}
+                              className="w-4 h-4 object-contain"
+                            />
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-[11px] font-medium text-gray-600">
+                                {item.sale_info.supermarket}
+                              </span>
+                              <span className="font-medium text-[13px] text-green-700">
+                                €{item.sale_info.currentPrice}
+                              </span>
+                              {item.sale_info.offerText && (
+                                <span className="text-[11px] text-green-600 font-medium">
+                                  {item.sale_info.offerText}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {item.product?.supermarket_data && item.product.supermarket_data.length > 1 && (
+                            <motion.div
+                              animate={{ rotate: expandedItems.has(`price-${item.id}`) ? 180 : 0 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                            </motion.div>
+                          )}
                         </div>
-                        {item.sale_info.validUntil && item.sale_info.validUntil.includes('t/m') ? (
-                          <span className="text-[11px] text-gray-500">
-                            {item.sale_info.validUntil}
-                          </span>
-                        ) : null}
+
+                        {/* Price Dropdown */}
+                        {item.product?.supermarket_data && item.product.supermarket_data.length > 1 && (
+                          <AnimatePresence>
+                            {expandedItems.has(`price-${item.id}`) && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="space-y-1 mt-1 overflow-hidden"
+                              >
+                                {item.product.supermarket_data
+                                  .filter(store => store.name !== item.sale_info?.supermarket)
+                                  .map((store) => (
+                                    <div
+                                      key={`${item.id}-${store.name}`}
+                                      className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1 px-2"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <img
+                                          src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
+                                          alt={store.name}
+                                          className="w-4 h-4 object-contain"
+                                        />
+                                        <div className="flex items-baseline gap-1.5">
+                                          <span className="text-[11px] font-medium text-gray-600">
+                                            {store.name}
+                                          </span>
+                                          <span className="font-medium text-[13px] text-gray-700">
+                                            €{store.price.replace('€', '').trim()}
+                                          </span>
+                                          {store.offerText && (
+                                            <span className="text-[11px] text-green-600 font-medium">
+                                              {store.offerText}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center justify-between">
@@ -465,88 +601,6 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                         </span>
                       </div>
                     )}
-                  </div>
-                  
-                  <div className="flex items-center self-center gap-1.5">
-                    {!item.search_term && item.product && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToGroceryList(item);
-                        }}
-                        disabled={isAddingItem.has(`tracked-${item.id}`)}
-                        className={cn(
-                          "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
-                          isAddingItem.has(`tracked-${item.id}`)
-                            ? "bg-gray-100 text-gray-400"
-                            : addedItems.has(`tracked-${item.id}`)
-                            ? "bg-green-100 hover:bg-green-200 text-green-700"
-                            : "bg-blue-50 hover:bg-blue-100 text-blue-600"
-                        )}
-                      >
-                        <AnimatePresence mode="wait">
-                          {isAddingItem.has(`tracked-${item.id}`) ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : addedItems.has(`tracked-${item.id}`) ? (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0 }}
-                            >
-                              <Check className="w-4 h-4" />
-                            </motion.div>
-                          ) : (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0 }}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </button>
-                    )}
-                    
-                    {/* Add chevron for search terms with matches */}
-                    {item.search_term && item.search_matches?.length ? (
-                      <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                        <motion.div
-                          animate={{ rotate: expandedItems.has(item.id) ? 180 : 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <ChevronDown className="h-4 w-4 text-gray-400" />
-                        </motion.div>
-                      </div>
-                    ) : null}
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUntrack(item.id);
-                      }}
-                      disabled={deletingProducts.has(item.id)}
-                      className={cn(
-                        "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
-                        deletingProducts.has(item.id)
-                          ? "bg-gray-100 text-gray-400"
-                          : "bg-red-50 hover:bg-red-100 text-red-600"
-                      )}
-                    >
-                      <AnimatePresence mode="wait">
-                        {deletingProducts.has(item.id) ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
-                          >
-                            <X className="w-4 h-4" />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </button>
                   </div>
                 </div>
 
