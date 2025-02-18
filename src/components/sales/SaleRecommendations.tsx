@@ -494,7 +494,7 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
     }
   }
 
-  return (
+    return (
     <div className="w-full max-w-md mx-auto px-4">
       <AnimatePresence>
         {showWelcomePopup && (
@@ -631,12 +631,12 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                               alt={result.saleItem.productName}
                               className="w-full h-full object-cover"
                             />
-                          </div>
-                        )}
+                            </div>
+                          )}
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-[13px] text-gray-900 leading-tight mb-1.5">
-                            {result.saleItem.productName}
-                          </h4>
+                              {result.saleItem.productName}
+                            </h4>
                           
                           <div className="space-y-1">
                             {result.saleItem.supermarkets?.map((store: SupermarketStore) => (
@@ -645,8 +645,8 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                                   <img
                                     src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
                                     alt={store.name}
-                                    className="w-4 h-4 object-contain"
-                                  />
+                                className="w-4 h-4 object-contain"
+                              />
                                   <div className="flex items-baseline gap-1.5">
                                     <span className={cn(
                                       "font-medium text-[13px]",
@@ -657,14 +657,14 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                                     {store.isRegularPrice ? (
                                       <span className="text-[11px] text-gray-600 font-medium">
                                         Reguliere prijs
-                                      </span>
+                            </span>
                                     ) : store.supermarket_data?.offerText && (
                                       <span className="text-[11px] text-green-600 font-medium">
                                         {store.supermarket_data.offerText}
-                                      </span>
-                                    )}
+                              </span>
+                            )}
                                   </div>
-                                </div>
+                          </div>
                                 
                                 <button
                                   onClick={() => handleAddToGroceryList(result.saleItem, store)}
@@ -858,19 +858,19 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                               alt={rec.saleItem.productName}
                               className="w-full h-full object-cover"
                             />
-                          </div>
-                        )}
+                            </div>
+                          )}
 
                         {/* Sale Item Info */}
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-[13px] text-gray-900 leading-tight mb-1.5">
-                            {rec.saleItem.productName}
-                          </h4>
+                              {rec.saleItem.productName}
+                            </h4>
                           
                           <div className="space-y-1">
                             {rec.saleItem.supermarkets?.map((store: SupermarketStore) => (
                               <div key={store.name} className="flex items-center justify-between bg-gray-50/80 rounded-lg py-1.5 px-2">
-                                <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                                   <img
                                     src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
                                     alt={store.name}
@@ -895,47 +895,47 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
                                   </div>
                                 </div>
                                 
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                     handleSwitch(group.groceryItem, rec.saleItem, store);
-                                  }}
+                                }}
                                   disabled={switchingItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`)}
-                                  className={cn(
+                                className={cn(
                                     "group relative flex h-6 px-2 items-center justify-center rounded-md text-[11px] font-medium transition-all duration-200",
                                     switchedItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`)
                                       ? "bg-green-100 hover:bg-green-200 text-green-700"
                                       : store.isRegularPrice
                                         ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
                                         : "bg-blue-50 hover:bg-blue-100 text-blue-700"
-                                  )}
-                                >
-                                  <AnimatePresence mode="wait">
+                                )}
+                              >
+                                <AnimatePresence mode="wait">
                                     {switchingItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`) ? (
                                       <Loader2 className="h-3 w-3 animate-spin" />
                                     ) : switchedItems.has(`${itemId}-${rec.saleItem.id}-${store.name}`) ? (
-                                      <motion.div
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        exit={{ scale: 0 }}
+                                    <motion.div
+                                      initial={{ scale: 0 }}
+                                      animate={{ scale: 1 }}
+                                      exit={{ scale: 0 }}
                                         className="flex items-center gap-1"
-                                      >
+                                    >
                                         <Check className="h-3 w-3" />
                                         <span>OK</span>
-                                      </motion.div>
-                                    ) : (
-                                      <motion.div
-                                        initial={{ scale: 0 }}
-                                        animate={{ scale: 1 }}
-                                        exit={{ scale: 0 }}
+                                    </motion.div>
+                                  ) : (
+                                    <motion.div
+                                      initial={{ scale: 0 }}
+                                      animate={{ scale: 1 }}
+                                      exit={{ scale: 0 }}
                                         className="flex items-center gap-1"
-                                      >
+                                    >
                                         <ArrowRightLeft className="h-3 w-3" />
                                         <span>Wissel</span>
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
-                                </button>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </button>
                               </div>
                             ))}
                           </div>
