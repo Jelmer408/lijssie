@@ -119,8 +119,16 @@ async function upsertProduct(product: Product) {
 
 async function scrapeProducts() {
     const browser = await puppeteer.launch({
-        headless: false,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process'
+        ]
     });
     const page = await browser.newPage();
 
