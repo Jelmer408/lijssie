@@ -72,39 +72,7 @@ export function getSubcategoriesForMainCategory(mainCategory: string): string[] 
   }
 }
 
-// Fuse.js options for fuzzy matching - Making it more Dutch-friendly
-const fuseOptions = {
-  includeScore: true,
-  threshold: 0.8, // Increased from 0.6 to 0.8 to be more lenient
-  minMatchCharLength: 2,
-  keys: ['saleItem.productName'],
-  // Add Dutch-specific options
-  ignoreLocation: true, // Ignore location of the match in the string
-  shouldSort: true,
-  findAllMatches: true,
-  // Add Dutch-specific normalization
-  getFn: (obj: Record<string, any>, path: string | string[]): string | string[] => {
-    const pathArray = Array.isArray(path) ? path : path.split('.');
-    const value = pathArray.reduce((acc: any, part: string) => acc?.[part], obj);
-    if (typeof value === 'string') {
-      return value
-        // Convert to lowercase
-        .toLowerCase()
-        // Replace Dutch specific characters
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        // Replace common Dutch words and variations
-        .replace(/\b(het|de|een)\b/g, '')
-        .replace(/\b(je|jouw|mijn)\b/g, '')
-        .replace(/\b(van|voor|met)\b/g, '')
-        .replace(/\b(en|of|maar)\b/g, '')
-        // Remove multiple spaces
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-    return Array.isArray(value) ? value : '';
-  }
-};
+// Fuse.js options for fuzzy matching - Making it more Dutch-friendly and lenient
 
 interface SupermarketStore {
   name: string;
@@ -162,16 +130,92 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   const [recommendations, setRecommendations] = useState<GroupedRecommendations>({});
   const [isLoading, setIsLoading] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [] = useState<Set<string>>(new Set());
   const [switchingItems, setSwitchingItems] = useState<Set<string>>(new Set());
   const [switchedItems, setSwitchedItems] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
-  const [, setHasSeenWelcome] = useState(false);
+  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
   const [isAddingItem, setIsAddingItem] = useState<Set<string>>(new Set());
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
+
+  // Check welcome message status
+  useEffect(() => {
+    const hasSeenWelcome = localStorage.getItem('has_seen_sale_welcome') === 'true';
+    if (!hasSeenWelcome) {
+      setShowWelcomePopup(true);
+      onPopupChange?.(true);
+    } else {
+      setHasSeenWelcome(true);
+    }
+  }, [onPopupChange]);
+
+  // Load recommendations when groceryList changes
+  useEffect(() => {
+    async function fetchRecommendations() {
+      // Filter out completed items
+      const activeItems = groceryList.filter(item => !item.completed);
+      
+      if (activeItems.length === 0) {
+        setRecommendations({});
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        // Get recommendations for all items
+        const newRecs = await hybridSearchService.searchSaleItems(activeItems);
+            
+        // Group recommendations and filter out non-sale items
+        const groupedRecs: GroupedRecommendations = {};
+        newRecs.forEach(rec => {
+          const key = rec.groceryItem.id;
+          
+          // Filter recommendations to only include items with active sales (offer text)
+          const saleRecommendations = rec.recommendations.filter(item => 
+            item.saleItem.supermarkets?.some(store => 
+              store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+            )
+          );
+          
+          // Only include products that have supermarkets with offer text
+          if (saleRecommendations.length > 0) {
+            // For each recommendation, only include supermarkets with offer text
+            const cleanedRecommendations = saleRecommendations.map(item => ({
+              ...item,
+              saleItem: {
+                ...item.saleItem,
+                supermarkets: item.saleItem.supermarkets?.filter(store =>
+                  store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+                )
+              }
+            }));
+
+            groupedRecs[key] = {
+              groceryItem: rec.groceryItem,
+              recommendations: cleanedRecommendations
+            };
+          }
+        });
+
+        console.log('Fetched recommendations:', groupedRecs);
+        setRecommendations(groupedRecs);
+        
+        // Only expand the first product that has recommendations
+        const firstItemWithRecs = Object.keys(groupedRecs)[0];
+        if (firstItemWithRecs) {
+          setExpandedItems(new Set([firstItemWithRecs]));
+        }
+      } catch (error) {
+        console.error('Error loading recommendations:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchRecommendations();
+  }, [groceryList]);
 
   // Add debounced search function
   const [debouncedSearch] = useState(() => {
@@ -189,123 +233,48 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   });
 
   const filterRecommendationsByFuzzyMatch = (groceryItemName: string, recommendations: Array<any>) => {
-    const fuse = new Fuse(recommendations, fuseOptions);
-    
-    // Normalize the search query the same way as the items
-    const normalizedQuery = groceryItemName
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\b(het|de|een)\b/g, '')
-      .replace(/\b(je|jouw|mijn)\b/g, '')
-      .replace(/\b(van|voor|met)\b/g, '')
-      .replace(/\b(en|of|maar)\b/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    const results = fuse.search(normalizedQuery);
-    
-    // Keep all matches with a more lenient score threshold
-    // Return all recommendations if no good matches are found
-    const filteredResults = results
-      .filter(result => result.score && result.score < 0.9) // Increased threshold
-      .map(result => result.item);
+    // First, ensure we have recommendations to work with
+    if (!recommendations || recommendations.length === 0) {
+      return [];
+    }
 
-    // If no matches found with fuzzy search, return all recommendations
-    return filteredResults.length > 0 ? filteredResults : recommendations;
+    // 1. Get all products that have offer text in supermarket_data
+    const productsOnSale = recommendations.filter(rec => {
+      // Check if any supermarket has an offer text
+      const hasActiveSale = rec.saleItem.supermarkets?.some((store: SupermarketStore) => 
+        store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+      );
+
+      // Only include if there's an active sale with offer text
+      return hasActiveSale;
+    });
+
+    // 2. If we have no products on sale, return empty array
+    if (productsOnSale.length === 0) {
+      return [];
+    }
+
+    // 3. Use basic Fuse.js for sorting purposes only
+    const fuseOptions = {
+      includeScore: true,
+      threshold: 0.9,
+      keys: ['saleItem.productName']
+    };
+
+    const fuse = new Fuse(productsOnSale, fuseOptions);
+    const results = fuse.search(groceryItemName);
+
+    // 4. Return only fuzzy matches that are on sale
+    return results.map(result => ({
+      ...result.item,
+      saleItem: {
+        ...result.item.saleItem,
+        supermarkets: result.item.saleItem.supermarkets?.filter(store =>
+          store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+        )
+      }
+    }));
   };
-
-  useEffect(() => {
-    const loadRecommendations = async () => {
-      // Filter out completed items
-      const activeItems = groceryList.filter(item => !item.completed);
-      
-      if (activeItems.length === 0) {
-        setRecommendations({});
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        // Always generate new recommendations for all items
-        const newRecs = await hybridSearchService.searchSaleItems(activeItems);
-            
-        // Group new recommendations with fuzzy matching
-        const groupedRecs: GroupedRecommendations = {};
-        newRecs.forEach(rec => {
-          const key = rec.groceryItem.id;
-          
-          // Apply fuzzy matching to filter recommendations, but keep all if no good matches
-          const filteredRecommendations = filterRecommendationsByFuzzyMatch(
-            rec.groceryItem.name,
-            rec.recommendations
-          );
-
-          if (filteredRecommendations.length > 0) {
-            groupedRecs[key] = {
-              groceryItem: rec.groceryItem,
-              recommendations: filteredRecommendations
-            };
-
-            // Cache recommendations
-            supabase
-              .from('sale_recommendations')
-              .upsert({
-                grocery_item_id: key,
-                recommendations: filteredRecommendations.map(r => ({
-                  ...r,
-                  saleItem: {
-                    ...r.saleItem,
-                    supermarkets: r.saleItem.supermarkets?.map((store: SupermarketStore) => ({
-                      ...store,
-                      supermarket_data: store.supermarket_data || {
-                        name: store.name,
-                        price: `€ ${store.currentPrice}`,
-                        offerText: store.offerText || `${store.savingsPercentage}% korting`,
-                        offerEndDate: store.validUntil
-                      }
-                    }))
-                  }
-                })),
-                created_at: new Date().toISOString()
-              })
-              .then(({ error }) => {
-                if (error) console.error('Error caching recommendations:', error);
-              });
-          }
-        });
-
-        setRecommendations(groupedRecs);
-        
-        // Only expand the first product that has recommendations
-        const firstItemWithRecs = Object.keys(groupedRecs)[0];
-        if (firstItemWithRecs) {
-          setExpandedItems(new Set([firstItemWithRecs]));
-        }
-      } catch (error) {
-        console.error('Error loading recommendations:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadRecommendations();
-  }, [groceryList]); // Only depend on groceryList to trigger refresh
-
-  useEffect(() => {
-    // Check if user has seen the welcome message
-    const checkWelcomeStatus = () => {
-      const hasSeenWelcome = localStorage.getItem('has_seen_sale_welcome') === 'true';
-      if (!hasSeenWelcome) {
-        setShowWelcomePopup(true);
-        onPopupChange?.(true);
-      } else {
-        setHasSeenWelcome(true);
-      }
-    };
-
-    checkWelcomeStatus();
-  }, [onPopupChange]);
 
   const handleCloseWelcome = () => {
     setShowWelcomePopup(false);
@@ -366,11 +335,27 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
     try {
       const results = await hybridSearchService.searchSingleItem(query);
       if (results.length > 0) {
-        // Apply fuzzy matching to search results
+        // Filter to only include items with offer text
+        const saleResults = results[0].recommendations.filter(item => 
+          item.saleItem.supermarkets?.some(store => 
+            store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+          )
+        ).map(item => ({
+          ...item,
+          saleItem: {
+            ...item.saleItem,
+            supermarkets: item.saleItem.supermarkets?.filter((store: SupermarketStore) =>
+              store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+            )
+          }
+        }));
+        
+        // Apply fuzzy matching to filtered results
         const filteredResults = filterRecommendationsByFuzzyMatch(
           query,
-          results[0].recommendations
+          saleResults
         );
+        
         setSearchResults(filteredResults);
       } else {
         setSearchResults([]);

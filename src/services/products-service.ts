@@ -132,72 +132,65 @@ class ProductsService {
 
       if (error) throw error;
 
-      // Group products by ID and collect all stores with offers
-      const productsMap = new Map<string, ProductWithSavings>();
+      const productsWithPrices: ProductWithSavings[] = [];
 
-      (data || []).forEach(product => {
-        if (!product.supermarket_data) return;
+      for (const product of data || []) {
+        if (!product.supermarket_data?.length) continue;
 
-        // Find supermarkets with offers
-        const storesWithOffers = product.supermarket_data
-          .filter((store: SupermarketData) => store.offerText)
+        // Get all store prices
+        const stores = product.supermarket_data
           .map((store: SupermarketData) => {
-            const currentPrice = store.price.replace('€', '').replace(',', '.').trim();
-            const originalPrice = store.pricePerUnit.replace('€', '').replace(',', '.').replace('/stuk', '').trim();
+            const currentPrice = this.parsePrice(store.price);
+            if (!currentPrice) return null;
 
-            if (!currentPrice || !originalPrice) return null;
-
-            const current = parseFloat(currentPrice);
-            const original = parseFloat(originalPrice);
-            const savingsPercentage = Math.round(((original - current) / original) * 100);
-
-            if (savingsPercentage <= 0) return null;
+            const originalPrice = this.parsePrice(store.pricePerUnit);
+            const savingsPercentage = originalPrice && currentPrice < originalPrice
+              ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
+              : 0;
 
             return {
               name: store.name,
-              currentPrice,
-              originalPrice,
+              currentPrice: currentPrice.toFixed(2),
+              originalPrice: originalPrice?.toFixed(2),
               saleType: store.offerText,
               validUntil: store.offerEndDate,
               savingsPercentage,
-              supermarket_data: {
-                name: store.name,
-                price: store.price,
-                offerText: store.offerText,
-                offerEndDate: store.offerEndDate,
-                pricePerUnit: store.pricePerUnit
-              }
+              isRegularPrice: !store.offerText,
+              supermarket_data: store
             };
           })
           .filter((store: StoreWithOffer | null): store is StoreWithOffer => store !== null);
 
-        if (storesWithOffers.length === 0) return;
+        if (!stores.length) continue;
 
-        // Get the best savings percentage across all stores
-        const bestSavings = Math.max(...storesWithOffers.map((store: StoreWithOffer) => store.savingsPercentage));
-        const bestStore = storesWithOffers.find((store: StoreWithOffer) => store.savingsPercentage === bestSavings)!;
+        // Find best price and savings
+        const bestStore = stores.reduce((best: StoreWithOffer, current: StoreWithOffer) => {
+          if (current.savingsPercentage > best.savingsPercentage) return current;
+          if (current.savingsPercentage === best.savingsPercentage) {
+            return parseFloat(current.currentPrice) < parseFloat(best.currentPrice) ? current : best;
+          }
+          return best;
+        }, stores[0]);
 
-        if (productsMap.has(product.id)) {
-          // Add stores to existing product
-          const existingProduct = productsMap.get(product.id)!;
-          existingProduct.supermarkets.push(...storesWithOffers);
-        } else {
-          // Create new product entry
-          productsMap.set(product.id, {
-            ...product,
-            savingsPercentage: bestSavings,
-            currentPrice: bestStore.currentPrice,
-            originalPrice: bestStore.originalPrice,
-            supermarkets: storesWithOffers,
-            saleType: bestStore.saleType,
-            validUntil: bestStore.validUntil
-          });
+        productsWithPrices.push({
+          ...product,
+          savingsPercentage: bestStore.savingsPercentage,
+          currentPrice: bestStore.currentPrice,
+          originalPrice: bestStore.originalPrice || bestStore.currentPrice,
+          supermarkets: stores,
+          saleType: bestStore.saleType,
+          validUntil: bestStore.validUntil
+        });
+      }
+
+      // Sort by savings first, then by price
+      return productsWithPrices.sort((a, b) => {
+        if (b.savingsPercentage !== a.savingsPercentage) {
+          return b.savingsPercentage - a.savingsPercentage;
         }
+        return parseFloat(a.currentPrice) - parseFloat(b.currentPrice);
       });
 
-      // Convert map to array and sort by best savings
-      return Array.from(productsMap.values())
-        .sort((a, b) => b.savingsPercentage - a.savingsPercentage);
     } catch (error) {
       console.error('Error finding products on sale:', error);
       return [];
