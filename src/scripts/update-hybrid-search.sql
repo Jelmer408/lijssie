@@ -116,7 +116,8 @@
     query_embedding vector(384),
     match_count int DEFAULT 20,
     full_text_weight float DEFAULT 1.0,
-    semantic_weight float DEFAULT 1.0
+    semantic_weight float DEFAULT 1.0,
+    only_sales boolean DEFAULT true
   ) RETURNS TABLE (
     id uuid,
     supermarket supermarket_name,
@@ -177,7 +178,9 @@
         -- Semantic similarity for finding variations/brands
         (1 - (s.embedding <=> query_embedding)) as semantic_similarity
       FROM supermarket_offers s
-      WHERE s.valid_until >= current_date
+      WHERE 
+        -- Only apply valid_until filter when only_sales is true
+        (NOT only_sales OR s.valid_until >= current_date)
         -- Pre-filter to reduce irrelevant matches
         AND (
           EXISTS (

@@ -205,7 +205,7 @@ class ProductsService {
     }
   }
 
-  async searchProductsOnSale(searchTerm: string): Promise<ProductWithSavings[]> {
+  async searchProductsOnSale(searchTerm: string, onlySales: boolean = true): Promise<ProductWithSavings[]> {
     try {
       const { data, error } = await supabase
         .from('products')
@@ -259,17 +259,13 @@ class ProductsService {
         // Find the lowest price among all stores
         const lowestPrice = Math.min(...allStores.map((store: StoreWithOffer) => parseFloat(store.currentPrice)));
 
-        // Filter stores to include:
-        // 1. Stores with active sales (offerText)
-        // 2. Stores with regular prices equal to or lower than the lowest sale price
-        const relevantStores = allStores.filter((store: StoreWithOffer) => {
-          const price = parseFloat(store.currentPrice);
-          const isCheaperRegularPrice = !store.saleType && price <= lowestPrice;
-          return store.saleType || isCheaperRegularPrice;
-        }).map((store: StoreWithOffer) => ({
-          ...store,
-          isRegularPrice: !store.saleType
-        }));
+        // Filter stores based on onlySales parameter
+        const relevantStores = onlySales
+          ? allStores.filter((store: StoreWithOffer) => store.saleType)
+          : allStores.map((store: StoreWithOffer) => ({
+              ...store,
+              isRegularPrice: !store.saleType
+            }));
 
         if (relevantStores.length === 0) return;
 

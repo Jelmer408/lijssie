@@ -99,14 +99,14 @@ class HybridSearchService {
     return results;
   }
 
-  async searchSingleItem(searchTerm: string): Promise<SearchResult[]> {
+  async searchSingleItem(searchTerm: string, onlySales: boolean = true): Promise<SearchResult[]> {
     // Expand search terms with Dutch synonyms
     const expandedTerms = expandDutchSearchTerms(searchTerm);
     const { category, subcategory } = getSynonymCategories(searchTerm);
 
-    // Search for products on sale that match any of the expanded terms
+    // Search for products that match any of the expanded terms
     const searchPromises = expandedTerms.map(term => 
-      productsService.searchProductsOnSale(term)
+      productsService.searchProductsOnSale(term, onlySales)
     );
 
     const searchResults = await Promise.all(searchPromises);
@@ -122,7 +122,7 @@ class HybridSearchService {
     const allSubcategories = await productsService.getAllSubcategories();
     const fuseOptions = {
       includeScore: true,
-      threshold: 0.4, // Lower threshold means stricter matching
+      threshold: 0.4,
       keys: ['name']
     };
 
@@ -138,7 +138,7 @@ class HybridSearchService {
     // Get fuzzy matched subcategories (excluding the one we already searched)
     const matchedSubcategories = fuse.search(searchTerm)
       .map((result) => (result.item as SubcategoryItem).name)
-      .filter(subcat => subcat !== subcategory); // Exclude already searched subcategory
+      .filter(subcat => subcat !== subcategory);
 
     // Get products from matched subcategories
     const subcategoryProducts = matchedSubcategories.length > 0 
@@ -159,27 +159,36 @@ class HybridSearchService {
       new Map(combinedProducts.map(item => [item.id, item])).values()
     );
 
-    // Filter to only include products that have at least one store with an offer text
-    const filteredProducts = uniqueProducts.filter(product => 
-      product.supermarkets.some((store: StoreData) => 
-        store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
-      )
-    );
+    // Filter products based on onlySales parameter
+    const filteredProducts = onlySales
+      ? uniqueProducts.filter(product => 
+          product.supermarkets.some((store: StoreData) => 
+            store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+          )
+        )
+      : uniqueProducts;
 
-    // Map products to recommendations format, only including stores with offer text
+    // Map products to recommendations format
     const recommendations = filteredProducts.map(product => {
-      // Get the first store with an offer text
-      const storeWithOffer = product.supermarkets.find((store: StoreData) => 
-        store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
-      );
+      // Get the first store with an offer text or just the first store if not filtering for sales
+      const storeWithOffer = onlySales
+        ? product.supermarkets.find((store: StoreData) => 
+            store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+          )
+        : product.supermarkets[0];
 
       return {
         saleItem: {
           id: product.id,
           productName: product.title,
-          supermarkets: product.supermarkets.filter((store: StoreData) => 
-            store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
-          ),
+          supermarkets: onlySales
+            ? product.supermarkets.filter((store: StoreData) => 
+                store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
+              )
+            : product.supermarkets.map(store => ({
+                ...store,
+                isRegularPrice: !store.supermarket_data?.offerText
+              })),
           currentPrice: product.currentPrice,
           originalPrice: product.originalPrice,
           saleType: product.saleType,
@@ -188,11 +197,12 @@ class HybridSearchService {
         },
         reason: storeWithOffer?.supermarket_data.offerText 
           ? `${storeWithOffer.supermarket_data.offerText} voor ${product.title}`
-          : `Aanbieding voor ${product.title}`,
+          : `Prijs voor ${product.title}`,
         savingsPercentage: product.savingsPercentage
       };
-    }).filter(rec => rec.saleItem.supermarkets.length > 0) // Only include if there are stores with offer text
-      .sort((a, b) => b.savingsPercentage - a.savingsPercentage); // Sort by highest savings first
+    })
+    .filter(rec => rec.saleItem.supermarkets.length > 0)
+    .sort((a, b) => b.savingsPercentage - a.savingsPercentage);
 
     if (recommendations.length > 0) {
       // Map synonym categories to app categories
@@ -209,7 +219,7 @@ class HybridSearchService {
       // Get emoji based on category
       const getEmoji = (cat: string): string => {
         switch (cat) {
-          case 'Huishouden': return '��';
+          case 'Huishouden': return '🧹';
           case 'Verzorging': return '🧴';
           case 'Tussendoor': return '🍪';
           case 'Dranken': return '🥤';
