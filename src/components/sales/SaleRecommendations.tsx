@@ -145,6 +145,7 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
   const [showWatchlistSearch, setShowWatchlistSearch] = useState(false);
   const [currentHouseholdId, setCurrentHouseholdId] = useState<string | undefined>();
+  const [isTrackingSearch, setIsTrackingSearch] = useState(false);
 
   // Check welcome message status
   useEffect(() => {
@@ -556,6 +557,61 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
     }
   };
 
+  // Add function to track search term
+  async function handleTrackSearchTerm(searchTerm: string) {
+    if (!searchTerm.trim() || !currentHouseholdId) return;
+
+    try {
+      setIsTrackingSearch(true);
+
+      // First check if the search term is already being tracked
+      const { data: existingEntry } = await supabase
+        .from('product_watchlist')
+        .select('id')
+        .eq('household_id', currentHouseholdId)
+        .eq('search_term', searchTerm.trim())
+        .single();
+
+      if (existingEntry) {
+        toast({
+          title: "Zoekterm wordt al getrackt",
+          description: "Je krijgt al een melding zodra er aanbiedingen zijn voor deze zoekterm.",
+          duration: 3000,
+        });
+        return;
+      }
+
+      // If not already tracked, add it
+      const { error } = await supabase
+        .from('product_watchlist')
+        .insert([
+          {
+            search_term: searchTerm.trim(),
+            household_id: currentHouseholdId,
+            created_at: new Date().toISOString(),
+          }
+        ]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Zoekterm wordt nu getrackt",
+        description: "We sturen je een bericht zodra er aanbiedingen zijn voor deze zoekterm.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Error tracking search term:', error);
+      toast({
+        title: "Er is iets misgegaan",
+        description: "Probeer het later opnieuw.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setIsTrackingSearch(false);
+    }
+  }
+
   return (
     <>
       <AnimatePresence>
@@ -649,7 +705,26 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
               className="w-full pl-12 pr-12 py-3.5 bg-white/80 hover:bg-white/90 focus:bg-white backdrop-blur-xl border border-gray-200/50 rounded-2xl shadow-sm text-[15px] text-gray-900 placeholder-gray-500 outline-none ring-0 focus:ring-2 ring-offset-0 ring-blue-500/20 transition-all duration-300"
             />
             {searchQuery && (
-              <div className="absolute inset-y-0 right-4 flex items-center">
+              <div className="absolute inset-y-0 right-4 flex items-center gap-2">
+                {/* Track Search Term Button */}
+                <button
+                  onClick={() => handleTrackSearchTerm(searchQuery)}
+                  disabled={isTrackingSearch}
+                  className={cn(
+                    "p-1.5 rounded-full transition-colors duration-200",
+                    isTrackingSearch
+                      ? "bg-gray-100 text-gray-400"
+                      : "hover:bg-blue-50 text-blue-500 hover:text-blue-600"
+                  )}
+                >
+                  {isTrackingSearch ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Bell className="h-4 w-4" />
+                  )}
+                </button>
+
+                {/* Clear Search Button */}
                 <button
                   onClick={() => {
                     setSearchQuery('');
@@ -670,11 +745,27 @@ ${getSubcategoriesForMainCategory(mainCategory).join('\n')}`;
           <div className="mb-8">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-gray-900">Zoekresultaten</h3>
-              {isSearching ? (
-                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-              ) : (
+              <div className="flex items-center gap-2">
+                {/* Track Search Button */}
+                <button
+                  onClick={() => handleTrackSearchTerm(searchQuery)}
+                  disabled={isTrackingSearch}
+                  className={cn(
+                    "flex items-center gap-1.5 py-1 px-2 rounded-full text-xs font-medium transition-colors duration-200",
+                    isTrackingSearch
+                      ? "bg-gray-100 text-gray-500"
+                      : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                  )}
+                >
+                  {isTrackingSearch ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Bell className="h-3 w-3" />
+                  )}
+                  Track zoekterm
+                </button>
                 <span className="text-xs text-gray-500">{searchResults.length} resultaten</span>
-              )}
+              </div>
             </div>
             <div className="space-y-2.5">
               <AnimatePresence>

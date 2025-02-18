@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BellOff, Loader2, Plus, Check, X, Search } from 'lucide-react';
+import { BellOff, Loader2, Plus, Check, X, Search, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { groceryService } from '@/services/grocery-service';
 import { Category } from '@/constants/categories';
+import { hybridSearchService } from '@/services/hybrid-search-service';
+import Fuse from 'fuse.js';
 
 interface SupermarketData {
   name: string;
@@ -31,6 +33,36 @@ interface DatabaseProduct {
   search_term?: string | null;
 }
 
+interface SearchMatchResult {
+  saleItem: {
+    id: string;
+    productName: string;
+    supermarkets: Array<{
+      name: string;
+      currentPrice: string;
+      originalPrice?: string;
+      saleType?: string;
+      validUntil?: string;
+      savingsPercentage: number;
+      offerText?: string;
+      supermarket_data?: {
+        name: string;
+        price: string;
+        offerText?: string;
+        offerEndDate?: string;
+        pricePerUnit: string;
+      };
+    }>;
+    currentPrice: string;
+    originalPrice?: string;
+    saleType?: string;
+    validUntil?: string;
+    imageUrl?: string;
+  };
+  reason: string;
+  savingsPercentage: number;
+}
+
 interface TrackedProduct {
   id: string;
   created_at: string;
@@ -47,6 +79,7 @@ interface TrackedProduct {
     offerText?: string;
     supermarket_data: SupermarketData;
   } | null;
+  search_matches?: SearchMatchResult[];
 }
 
 interface TrackedProductsListProps {
@@ -60,6 +93,7 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
   const [deletingProducts, setDeletingProducts] = useState<Set<string>>(new Set());
   const [isAddingItem, setIsAddingItem] = useState<Set<string>>(new Set());
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchTrackedProducts();
@@ -70,20 +104,18 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'product_watchlist',
           filter: `household_id=eq.${householdId}`
         },
         (payload) => {
           console.log('Real-time update:', payload);
-          // Refresh the list when changes occur
           fetchTrackedProducts();
         }
       )
       .subscribe();
 
-    // Cleanup subscription on unmount
     return () => {
       subscription.unsubscribe();
     };
@@ -113,8 +145,8 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
 
       if (error) throw error;
 
-      // Process products and their sale information
-      const productsWithSales = ((data as unknown) as DatabaseProduct[]).map((item: DatabaseProduct) => {
+      // Process products and fetch search results for search terms
+      const processedProducts = await Promise.all(((data as unknown) as DatabaseProduct[]).map(async (item: DatabaseProduct) => {
         // Initialize the base product without sales
         const baseProduct: TrackedProduct = {
           id: item.id,
@@ -124,36 +156,53 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
           sale_info: null
         };
 
-        // If it's a search term tracking, return as is
+        // If it's a search term tracking, fetch matching products
         if (item.search_term) {
+          const searchResults = await hybridSearchService.searchSingleItem(item.search_term);
+          if (searchResults.length > 0) {
+            // Create Fuse instance for fuzzy matching
+            const fuse = new Fuse(searchResults[0].recommendations, {
+              keys: ['saleItem.productName'],
+              includeScore: true,
+              threshold: 0.4, // Lower threshold means stricter matching
+              minMatchCharLength: 3
+            });
+
+            // Perform fuzzy search and filter results
+            const fuzzyResults = fuse.search(item.search_term);
+            const filteredMatches = fuzzyResults
+              .filter(result => result.score && result.score < 0.4) // Only keep good matches
+              .map(result => result.item);
+
+            // Sort by savings percentage
+            const sortedMatches = filteredMatches.sort((a, b) => b.savingsPercentage - a.savingsPercentage);
+
+            baseProduct.search_matches = sortedMatches;
+          }
           return baseProduct;
         }
 
-        // Check if product has supermarket data with offers
+        // Handle product tracking as before
         if (!item.product?.supermarket_data || !Array.isArray(item.product.supermarket_data)) {
           return baseProduct;
         }
 
-        // Find sales with actual offers
         const salesWithOffers = item.product?.supermarket_data.filter((store: SupermarketData) => 
           store?.offerText && 
           store.offerText.trim() !== '' &&
           store?.price
         );
 
-        // If no actual offers, return the base product
         if (salesWithOffers.length === 0) {
           return baseProduct;
         }
 
-        // Find the best sale (lowest price) among offers
         const bestSale = salesWithOffers.reduce((best: SupermarketData, current: SupermarketData) => {
           const currentPrice = parseFloat(current.price.replace('€', '').trim());
           const bestPrice = best ? parseFloat(best.price.replace('€', '').trim()) : Infinity;
           return currentPrice < bestPrice ? current : best;
         });
 
-        // If we found a valid sale, return the product with sale info
         if (bestSale) {
           return {
             ...baseProduct,
@@ -169,15 +218,27 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
         }
 
         return baseProduct;
-      });
+      }));
 
-      setTrackedProducts(productsWithSales);
+      setTrackedProducts(processedProducts);
     } catch (err) {
       console.error('Error fetching tracked products:', err);
     } finally {
       setIsLoading(false);
     }
   }
+
+  const toggleExpanded = (itemId: string) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
 
   async function handleUntrack(productId: string) {
     try {
@@ -342,17 +403,27 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                 exit={{ opacity: 0, y: -10 }}
                 className="bg-white rounded-2xl border border-gray-200/50 shadow-sm p-2.5"
               >
-                <div className="flex items-center gap-2">
+                <div 
+                  className={cn(
+                    "flex items-center gap-2",
+                    (item.search_matches?.length ?? 0) > 0 && "cursor-pointer"
+                  )}
+                  onClick={() => {
+                    if (item.search_matches?.length) {
+                      toggleExpanded(item.id);
+                    }
+                  }}
+                >
                   {item.search_term ? (
                     <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 flex-shrink-0">
                       <Search className="w-5 h-5 text-blue-500" />
                     </div>
                   ) : item.product?.image_url ? (
-                    <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white">
+                    <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white border border-gray-100">
                       <img
                         src={item.product.image_url}
                         alt={item.product.title}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-contain bg-white"
                       />
                     </div>
                   ) : null}
@@ -384,16 +455,25 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                         ) : null}
                       </div>
                     ) : (
-                      <span className="text-[11px] text-gray-500">
-                        {item.search_term ? 'Zoekterm wordt getrackt' : 'Nog niet in de aanbieding'}
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-gray-500">
+                          {item.search_term ? (
+                            item.search_matches?.length ? 
+                              `${item.search_matches.length} aanbieding${item.search_matches.length !== 1 ? 'en' : ''} gevonden` : 
+                              'Zoekterm wordt getrackt'
+                          ) : 'Nog niet in de aanbieding'}
+                        </span>
+                      </div>
                     )}
                   </div>
                   
                   <div className="flex items-center self-center gap-1.5">
                     {!item.search_term && item.product && (
                       <button
-                        onClick={() => handleAddToGroceryList(item)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToGroceryList(item);
+                        }}
                         disabled={isAddingItem.has(`tracked-${item.id}`)}
                         className={cn(
                           "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
@@ -428,8 +508,23 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                       </button>
                     )}
                     
+                    {/* Add chevron for search terms with matches */}
+                    {item.search_term && item.search_matches?.length ? (
+                      <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <motion.div
+                          animate={{ rotate: expandedItems.has(item.id) ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <ChevronDown className="h-4 w-4 text-gray-400" />
+                        </motion.div>
+                      </div>
+                    ) : null}
+
                     <button
-                      onClick={() => handleUntrack(item.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUntrack(item.id);
+                      }}
                       disabled={deletingProducts.has(item.id)}
                       className={cn(
                         "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
@@ -454,6 +549,126 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                     </button>
                   </div>
                 </div>
+
+                {/* Search Matches Expansion Panel */}
+                {item.search_term && item.search_matches && item.search_matches.length > 0 && (
+                  <AnimatePresence>
+                    {expandedItems.has(item.id) && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="mt-2 border-t border-gray-100/50 pt-2 space-y-2"
+                      >
+                        {item.search_matches.map((match, index) => (
+                          <motion.div
+                            key={`${item.id}-match-${index}`}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="flex items-start gap-2.5 bg-gray-50/80 rounded-xl p-2.5"
+                          >
+                            {match.saleItem.imageUrl && (
+                              <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white border border-gray-100">
+                                <img
+                                  src={match.saleItem.imageUrl}
+                                  alt={match.saleItem.productName}
+                                  className="w-full h-full object-contain bg-white"
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-[13px] text-gray-900 leading-tight mb-1.5">
+                                {match.saleItem.productName}
+                              </h4>
+                              
+                              <div className="space-y-1">
+                                {match.saleItem.supermarkets?.map((store, storeIndex) => (
+                                  <div 
+                                    key={`${item.id}-${index}-${storeIndex}`}
+                                    className="flex items-center justify-between bg-white rounded-lg py-1.5 px-2"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <img
+                                        src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
+                                        alt={store.name}
+                                        className="w-4 h-4 object-contain"
+                                      />
+                                      <div className="flex items-baseline gap-1.5">
+                                        <span className="font-medium text-[13px] text-green-700">
+                                          €{store.currentPrice}
+                                        </span>
+                                        {store.supermarket_data?.offerText && (
+                                          <span className="text-[11px] text-green-600 font-medium">
+                                            {store.supermarket_data.offerText}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    <button
+                                      onClick={() => handleAddToGroceryList({
+                                        ...item,
+                                        product: {
+                                          id: match.saleItem.id,
+                                          title: match.saleItem.productName,
+                                          image_url: match.saleItem.imageUrl || null,
+                                          quantity_info: null,
+                                          category: null,
+                                          subcategory: null,
+                                          supermarket_data: match.saleItem.supermarkets.map(store => ({
+                                            name: store.name,
+                                            logoUrl: `/supermarkets/${store.name.toLowerCase()}-logo.png`,
+                                            price: store.currentPrice,
+                                            pricePerUnit: store.supermarket_data?.pricePerUnit || store.currentPrice,
+                                            offerText: store.supermarket_data?.offerText,
+                                            offerEndDate: store.supermarket_data?.offerEndDate
+                                          } as SupermarketData))
+                                        }
+                                      })}
+                                      disabled={isAddingItem.has(`match-${match.saleItem.id}-${store.name}`)}
+                                      className={cn(
+                                        "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
+                                        isAddingItem.has(`match-${match.saleItem.id}-${store.name}`)
+                                          ? "bg-gray-100 text-gray-400"
+                                          : addedItems.has(`match-${match.saleItem.id}-${store.name}`)
+                                          ? "bg-green-100 hover:bg-green-200 text-green-700"
+                                          : "bg-blue-50 hover:bg-blue-100 text-blue-600"
+                                      )}
+                                    >
+                                      <AnimatePresence mode="wait">
+                                        {isAddingItem.has(`match-${match.saleItem.id}-${store.name}`) ? (
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : addedItems.has(`match-${match.saleItem.id}-${store.name}`) ? (
+                                          <motion.div
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            exit={{ scale: 0 }}
+                                          >
+                                            <Check className="w-4 h-4" />
+                                          </motion.div>
+                                        ) : (
+                                          <motion.div
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            exit={{ scale: 0 }}
+                                          >
+                                            <Plus className="w-4 h-4" />
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                )}
               </motion.div>
             ))
           )}
