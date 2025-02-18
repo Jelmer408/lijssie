@@ -409,7 +409,7 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                       <Search className="w-5 h-5 text-blue-500" />
                     </div>
                   ) : item.product?.image_url ? (
-                    <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white border border-gray-100">
+                    <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white border border-gray-100 flex items-center justify-center">
                       <img
                         src={item.product.image_url}
                         alt={item.product.title}
@@ -418,12 +418,12 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                     </div>
                   ) : null}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-1">
-                      <h3 className="font-medium text-[13px] text-gray-900 leading-tight">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-medium text-[13px] text-gray-900 leading-tight truncate">
                         {item.search_term ? `Zoekterm: "${item.search_term}"` : item.product?.title}
                       </h3>
                       
-                      <div className="flex items-center gap-1.5 ml-2">
+                      <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
                         {!item.search_term && item.product && (
                           <button
                             onClick={(e) => {
@@ -465,7 +465,13 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                         )}
                         
                         {item.search_term && item.search_matches?.length ? (
-                          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <div 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpanded(item.id);
+                            }}
+                            className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                          >
                             <motion.div
                               animate={{ rotate: expandedItems.has(item.id) ? 180 : 0 }}
                               transition={{ duration: 0.2 }}
@@ -621,10 +627,10 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.05 }}
-                            className="flex items-start gap-2.5 bg-gray-50/80 rounded-xl p-2.5"
+                            className="flex items-start gap-2.5 bg-gray-50/80 rounded-xl p-2"
                           >
                             {match.saleItem.imageUrl && (
-                              <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white border border-gray-100">
+                              <div className="relative w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white border border-gray-100 flex items-center justify-center">
                                 <img
                                   src={match.saleItem.imageUrl}
                                   alt={match.saleItem.productName}
@@ -633,88 +639,147 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-[13px] text-gray-900 leading-tight mb-1.5">
-                                {match.saleItem.productName}
-                              </h4>
+                              <div className="flex items-center justify-between mb-1">
+                                <h4 className="font-medium text-[13px] text-gray-900 leading-tight truncate">
+                                  {match.saleItem.productName}
+                                </h4>
+                                <button
+                                  onClick={() => handleAddToGroceryList({
+                                    ...item,
+                                    product: {
+                                      id: match.saleItem.id,
+                                      title: match.saleItem.productName,
+                                      image_url: match.saleItem.imageUrl || null,
+                                      quantity_info: null,
+                                      category: null,
+                                      subcategory: null,
+                                      supermarket_data: match.saleItem.supermarkets.map(store => ({
+                                        name: store.name,
+                                        logoUrl: `/supermarkets/${store.name.toLowerCase()}-logo.png`,
+                                        price: store.currentPrice,
+                                        pricePerUnit: store.supermarket_data?.pricePerUnit || store.currentPrice,
+                                        offerText: store.supermarket_data?.offerText,
+                                        offerEndDate: store.supermarket_data?.offerEndDate
+                                      } as SupermarketData))
+                                    }
+                                  })}
+                                  disabled={isAddingItem.has(`match-${match.saleItem.id}`)}
+                                  className={cn(
+                                    "flex items-center justify-center w-7 h-7 rounded-lg transition-colors ml-2 flex-shrink-0",
+                                    isAddingItem.has(`match-${match.saleItem.id}`)
+                                      ? "bg-gray-100 text-gray-400"
+                                      : addedItems.has(`match-${match.saleItem.id}`)
+                                      ? "bg-green-100 hover:bg-green-200 text-green-700"
+                                      : "bg-blue-50 hover:bg-blue-100 text-blue-600"
+                                  )}
+                                >
+                                  <AnimatePresence mode="wait">
+                                    {isAddingItem.has(`match-${match.saleItem.id}`) ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : addedItems.has(`match-${match.saleItem.id}`) ? (
+                                      <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        exit={{ scale: 0 }}
+                                      >
+                                        <Check className="w-4 h-4" />
+                                      </motion.div>
+                                    ) : (
+                                      <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        exit={{ scale: 0 }}
+                                      >
+                                        <Plus className="w-4 h-4" />
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </button>
+                              </div>
                               
                               <div className="space-y-1">
-                                {match.saleItem.supermarkets?.map((store, storeIndex) => (
+                                {/* First store (best price) */}
+                                {match.saleItem.supermarkets?.length > 0 && (
                                   <div 
-                                    key={`${item.id}-${index}-${storeIndex}`}
-                                    className="flex items-center justify-between bg-white rounded-lg py-1.5 px-2"
+                                    className="flex items-center justify-between bg-white rounded-lg py-1 px-2 cursor-pointer hover:bg-gray-50/80 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleExpanded(`match-${item.id}-${match.saleItem.id}`);
+                                    }}
                                   >
                                     <div className="flex items-center gap-2">
                                       <img
-                                        src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
-                                        alt={store.name}
+                                        src={`/supermarkets/${match.saleItem.supermarkets[0].name.toLowerCase()}-logo.png`}
+                                        alt={match.saleItem.supermarkets[0].name}
                                         className="w-4 h-4 object-contain"
                                       />
                                       <div className="flex items-baseline gap-1.5">
-                                        <span className="font-medium text-[13px] text-green-700">
-                                          €{store.currentPrice}
+                                        <span className="text-[11px] font-medium text-gray-600">
+                                          {match.saleItem.supermarkets[0].name}
                                         </span>
-                                        {store.supermarket_data?.offerText && (
+                                        <span className="font-medium text-[13px] text-green-700">
+                                          €{match.saleItem.supermarkets[0].currentPrice}
+                                        </span>
+                                        {match.saleItem.supermarkets[0].supermarket_data?.offerText && (
                                           <span className="text-[11px] text-green-600 font-medium">
-                                            {store.supermarket_data.offerText}
+                                            {match.saleItem.supermarkets[0].supermarket_data.offerText}
                                           </span>
                                         )}
                                       </div>
                                     </div>
-                                    
-                                    <button
-                                      onClick={() => handleAddToGroceryList({
-                                        ...item,
-                                        product: {
-                                          id: match.saleItem.id,
-                                          title: match.saleItem.productName,
-                                          image_url: match.saleItem.imageUrl || null,
-                                          quantity_info: null,
-                                          category: null,
-                                          subcategory: null,
-                                          supermarket_data: match.saleItem.supermarkets.map(store => ({
-                                            name: store.name,
-                                            logoUrl: `/supermarkets/${store.name.toLowerCase()}-logo.png`,
-                                            price: store.currentPrice,
-                                            pricePerUnit: store.supermarket_data?.pricePerUnit || store.currentPrice,
-                                            offerText: store.supermarket_data?.offerText,
-                                            offerEndDate: store.supermarket_data?.offerEndDate
-                                          } as SupermarketData))
-                                        }
-                                      })}
-                                      disabled={isAddingItem.has(`match-${match.saleItem.id}-${store.name}`)}
-                                      className={cn(
-                                        "flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
-                                        isAddingItem.has(`match-${match.saleItem.id}-${store.name}`)
-                                          ? "bg-gray-100 text-gray-400"
-                                          : addedItems.has(`match-${match.saleItem.id}-${store.name}`)
-                                          ? "bg-green-100 hover:bg-green-200 text-green-700"
-                                          : "bg-blue-50 hover:bg-blue-100 text-blue-600"
-                                      )}
-                                    >
-                                      <AnimatePresence mode="wait">
-                                        {isAddingItem.has(`match-${match.saleItem.id}-${store.name}`) ? (
-                                          <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : addedItems.has(`match-${match.saleItem.id}-${store.name}`) ? (
-                                          <motion.div
-                                            initial={{ scale: 0 }}
-                                            animate={{ scale: 1 }}
-                                            exit={{ scale: 0 }}
-                                          >
-                                            <Check className="w-4 h-4" />
-                                          </motion.div>
-                                        ) : (
-                                          <motion.div
-                                            initial={{ scale: 0 }}
-                                            animate={{ scale: 1 }}
-                                            exit={{ scale: 0 }}
-                                          >
-                                            <Plus className="w-4 h-4" />
-                                          </motion.div>
-                                        )}
-                                      </AnimatePresence>
-                                    </button>
+                                    {match.saleItem.supermarkets.length > 1 && (
+                                      <motion.div
+                                        animate={{ rotate: expandedItems.has(`match-${item.id}-${match.saleItem.id}`) ? 180 : 0 }}
+                                        transition={{ duration: 0.2 }}
+                                      >
+                                        <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                                      </motion.div>
+                                    )}
                                   </div>
-                                ))}
+                                )}
+
+                                {/* Other stores dropdown */}
+                                {match.saleItem.supermarkets.length > 1 && (
+                                  <AnimatePresence>
+                                    {expandedItems.has(`match-${item.id}-${match.saleItem.id}`) && (
+                                      <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="space-y-1 mt-1 overflow-hidden"
+                                      >
+                                        {match.saleItem.supermarkets.slice(1).map((store, storeIndex) => (
+                                          <div
+                                            key={`${item.id}-${match.saleItem.id}-${storeIndex}`}
+                                            className="flex items-center justify-between bg-white rounded-lg py-1 px-2"
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              <img
+                                                src={`/supermarkets/${store.name.toLowerCase()}-logo.png`}
+                                                alt={store.name}
+                                                className="w-4 h-4 object-contain"
+                                              />
+                                              <div className="flex items-baseline gap-1.5">
+                                                <span className="text-[11px] font-medium text-gray-600">
+                                                  {store.name}
+                                                </span>
+                                                <span className="font-medium text-[13px] text-gray-700">
+                                                  €{store.currentPrice}
+                                                </span>
+                                                {store.supermarket_data?.offerText && (
+                                                  <span className="text-[11px] text-green-600 font-medium">
+                                                    {store.supermarket_data.offerText}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                )}
                               </div>
                             </div>
                           </motion.div>

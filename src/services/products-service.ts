@@ -257,7 +257,6 @@ class ProductsService {
         if (allStores.length === 0) return;
 
         // Find the lowest price among all stores
-        const lowestPrice = Math.min(...allStores.map((store: StoreWithOffer) => parseFloat(store.currentPrice)));
 
         // Filter stores based on onlySales parameter
         const relevantStores = onlySales

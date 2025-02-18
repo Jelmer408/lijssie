@@ -250,62 +250,46 @@ export function SaleRecommendations({ groceryList, householdName, onPopupChange 
   });
 
   const filterRecommendationsByFuzzyMatch = (groceryItemName: string, recommendations: Array<any>, onlySales: boolean) => {
-    console.log('filterRecommendationsByFuzzyMatch called with:', { groceryItemName, onlySales, recommendationsCount: recommendations?.length });
-    
-    // First, ensure we have recommendations to work with
-    if (!recommendations || recommendations.length === 0) {
-      return [];
-    }
-
-    // Use Fuse.js for fuzzy matching first
-    const fuseOptions = {
+    // Create Fuse instance for fuzzy matching
+    const fuse = new Fuse(recommendations, {
+      keys: ['saleItem.productName'],
       includeScore: true,
-      threshold: 0.9,
-      keys: ['saleItem.productName']
-    };
-
-    const fuse = new Fuse(recommendations, fuseOptions);
-    const fuzzyResults = fuse.search(groceryItemName);
-    console.log('Fuzzy search results:', fuzzyResults.length);
-
-    // Process each result
-    const processedResults = fuzzyResults.map(result => {
-      const item = result.item;
-      const supermarkets = item.saleItem.supermarkets || [];
-
-      // When onlySales is false, include all supermarkets
-      if (!onlySales) {
-        return {
-          ...item,
-      saleItem: {
-            ...item.saleItem,
-            supermarkets: supermarkets.map((store: SupermarketStore) => ({
-              ...store,
-              isRegularPrice: !store.supermarket_data?.offerText
-            }))
-          }
-        };
-      }
-
-      // For sales mode, only include supermarkets with active sales
-      const salesSupermarkets = supermarkets.filter((store: SupermarketStore) => 
-        store.supermarket_data?.offerText && store.supermarket_data.offerText !== ''
-      );
-
-      if (salesSupermarkets.length === 0) return null;
-
-      return {
-        ...item,
-        saleItem: {
-          ...item.saleItem,
-          supermarkets: salesSupermarkets
-        }
-      };
+      threshold: 0.4, // Lower threshold means stricter matching
+      minMatchCharLength: 3
     });
 
-    const filteredResults = processedResults.filter(Boolean);
-    console.log('Final filtered results:', filteredResults.length);
-    return filteredResults;
+    // Perform fuzzy search and get scored results
+    const fuzzyResults = fuse.search(groceryItemName);
+
+    // Filter and map results
+    const filteredResults = fuzzyResults
+      .filter(result => {
+        // Only keep good matches (lower score is better)
+        if (!result.score || result.score > 0.4) return false;
+        
+        // If onlySales is true, only keep items with offerText
+        if (onlySales) {
+          return result.item.saleItem.supermarkets.some(
+            (store: any) => store.supermarket_data?.offerText
+          );
+        }
+        return true;
+      })
+      .map(result => ({
+        ...result.item,
+        matchScore: result.score // Keep the match score for sorting
+      }));
+
+    // Sort results: first by match score (closer matches first), then by savings percentage
+    return filteredResults.sort((a, b) => {
+      // First compare match scores (lower is better)
+      const scoreDiff = (a.matchScore || 0) - (b.matchScore || 0);
+      if (Math.abs(scoreDiff) > 0.1) { // Only use score if the difference is significant
+        return scoreDiff;
+      }
+      // If match scores are similar, sort by savings percentage
+      return b.savingsPercentage - a.savingsPercentage;
+    });
   };
 
   const handleCloseWelcome = () => {
