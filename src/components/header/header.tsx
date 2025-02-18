@@ -193,6 +193,20 @@ export function Header({
                 e.preventDefault();
                 if (activeView === 'finance') {
                   setIsAddExpenseOpen(true);
+                  setIsAddProductDrawerOpen(false);
+                  setNewItem({
+                    name: '',
+                    quantity: '',
+                    unit: '',
+                    category: 'Overig',
+                    subcategory: null,
+                    priority: false,
+                    emoji: '📦',
+                    user_id: user?.id || '',
+                    user_name: user?.user_metadata?.name || null,
+                    user_avatar: user?.user_metadata?.avatar_url || null,
+                    household_id: household?.id || ''
+                  });
                 } else {
                   setIsAddProductDrawerOpen(true);
                 }
@@ -236,15 +250,32 @@ export function Header({
         )}
       </div>
 
-      {/* Add Product Drawer */}
-      <AddProductDrawer
-        isOpen={isAddProductDrawerOpen}
-        onClose={() => setIsAddProductDrawerOpen(false)}
-        newItem={newItem}
-        onItemChange={handleItemChange}
-        onAddItem={handleAddItem}
-        householdId={household?.id || ''}
-      />
+      {/* Add Product Drawer - Only render when not in finance view */}
+      {activeView !== 'finance' && (
+        <AddProductDrawer
+          isOpen={isAddProductDrawerOpen}
+          onClose={() => {
+            setIsAddProductDrawerOpen(false);
+            setNewItem({
+              name: '',
+              quantity: '',
+              unit: '',
+              category: 'Overig',
+              subcategory: null,
+              priority: false,
+              emoji: '📦',
+              user_id: user?.id || '',
+              user_name: user?.user_metadata?.name || null,
+              user_avatar: user?.user_metadata?.avatar_url || null,
+              household_id: household?.id || ''
+            });
+          }}
+          newItem={newItem}
+          onItemChange={handleItemChange}
+          onAddItem={handleAddItem}
+          householdId={household?.id || ''}
+        />
+      )}
 
       {/* Household Settings Drawer */}
       <Drawer open={isHouseholdModalOpen} onOpenChange={setIsHouseholdModalOpen}>

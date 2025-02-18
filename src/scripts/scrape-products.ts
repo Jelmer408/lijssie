@@ -170,7 +170,7 @@ async function scrapeProducts() {
 
                     await new Promise(resolve => setTimeout(resolve, 1500));
 
-                    const productDetails = await page.evaluate(async (subcategoryData) => {
+                    const productDetails = await page.evaluate(async (data) => {
                         const name = document.querySelector('.text-xl.font-bold.md\\:text-3xl')?.textContent?.trim();
                         const imageElement = document.querySelector('.h-full.w-full.object-contain.opacity-100.transition-opacity.lazyLoad.isLoaded') as HTMLImageElement;
                         const imageUrl = imageElement?.src;
@@ -222,17 +222,18 @@ async function scrapeProducts() {
                             name,
                             imageUrl,
                             weight: weight || '',
-                            category: breadcrumbCategory || subcategoryData.mainCategory,
-                            subcategory: subcategoryData.name,
-                            mainCategory: subcategoryData.mainCategory,
+                            category: breadcrumbCategory || data.mainCategory,
+                            subcategory: data.name,
+                            mainCategory: data.mainCategory,
                             price,
                             pricePerUnit: pricePerUnit || '',
                             supermarkets,
-                            itemUrl: productUrl
+                            itemUrl: data.productUrl
                         } as Product;
                     }, {
                         name: subcategory.name,
-                        mainCategory: subcategory.mainCategory
+                        mainCategory: subcategory.mainCategory,
+                        productUrl: productUrl
                     });
 
                     if (productDetails && productDetails.name) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, ChevronDown, ChevronUp } from 'lucide-react'
+import { Upload, ChevronLeft } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -53,6 +53,55 @@ interface AddProductDrawerProps {
   householdId: string;
 }
 
+interface CategorySelectionScreenProps {
+  selectedCategory: Category;
+  onSelectCategory: (category: Category) => void;
+  onBack: () => void;
+}
+
+function CategorySelectionScreen({ selectedCategory, onSelectCategory, onBack }: CategorySelectionScreenProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 300 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -300 }}
+      className="absolute inset-0 bg-white z-10 flex flex-col"
+    >
+      <div className="px-6 py-3 border-b">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <h2 className="text-sm font-medium">Kies een categorie</h2>
+        </div>
+      </div>
+
+      <div className="flex-1 px-4 py-3">
+        <div className="grid grid-cols-4 gap-1.5 h-full">
+          {CATEGORIES.map((category) => (
+            <motion.button
+              key={category}
+              onClick={() => onSelectCategory(category as Category)}
+              className={`flex flex-col items-center justify-center p-1.5 rounded-lg border transition-all ${
+                selectedCategory === category
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+              }`}
+              whileTap={{ scale: 0.98 }}
+            >
+              <span className="text-base">{categoryEmojis[category as Category]}</span>
+              <span className="text-[10px] leading-tight text-center line-clamp-2 mt-0.5 px-0.5">{category}</span>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export function AddProductDrawer({
   isOpen,
   onClose,
@@ -62,6 +111,9 @@ export function AddProductDrawer({
   householdId
 }: AddProductDrawerProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isAIProcessing, setIsAIProcessing] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [showCategoryScreen, setShowCategoryScreen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [extractedIngredients, setExtractedIngredients] = useState<RecipeIngredient[]>([]);
@@ -174,10 +226,13 @@ export function AddProductDrawer({
     let timeout: NodeJS.Timeout;
     return (value: string) => {
       clearTimeout(timeout);
+      setIsTyping(true);
       timeout = setTimeout(() => {
         if (value.length >= 2) {
+          setIsAIProcessing(true);
           getAISuggestions(value);
         }
+        setIsTyping(false);
       }, 1000); // Wait 1 second after typing stops
     };
   });
@@ -221,6 +276,7 @@ export function AddProductDrawer({
       if (!GOOGLE_AI_KEY) {
         console.warn('No Gemini AI key available, falling back to basic categorization');
         await fallbackToBasicCategorization(itemName);
+        setIsAIProcessing(false);
         return;
       }
 
@@ -280,53 +336,7 @@ export function AddProductDrawer({
         }
 
         Available subcategories for ${mainCategory}:
-        ${
-          mainCategory === 'Aardappel, groente en fruit' ? 
-            'Aardappelen, Groente, Fruit, Diepvries groente, Diepvries fruit, Gezonde kruiden, Snackgroente en snackfruit, Fruitsalde, Smoothies en sappen' :
-          mainCategory === 'Salades en maaltijden' ?
-            'Salades, Kant en klare maaltijden, Quiches, Ovenschotels, Poffertjes en pannenkoeken, Pizza, Verse soepen, Verspakketten, Diepvries kant en klare maaltijden, Snel snacken, Sandwiches, Sushi' :
-          mainCategory === 'Kaas, vleeswaren en tapas' ?
-            'Kaas, Vleeswaren, Hummus, Borrelhapjes, Droge worst, Dips en smeersels' :
-          mainCategory === 'Vlees, kip en vis' ?
-            'Vlees, Vis, Rundvlees, Varkensvlees, Kip, Kalkoen, Halal, BBQ en Gourmet, Reepjes en blokjes vlees, Worst, Schelpdieren, Kalfsvlees en wild' :
-          mainCategory === 'Vegetarisch, plantaardig en vegan' ?
-            'Vleesvervangers, Plantaardige, Visvervangers, Vegetarische en plantaardige vleeswaren, Tofu, Vegetarische spreads, Plantaardige spreads, Vegetarische snack, Plantaardige kaas' :
-          mainCategory === 'Zuivel, boter en eieren' ?
-            'Zuivel, Eieren, Kaas, Boter en margarine, Melk, High Protein zuivel, Yoghurt en kwark, Koffiemelk en room, Toetjes, Drinkyohurt, Lactosevrijve zuivel, Zuivel tussendoortjes' :
-          mainCategory === 'Broden, bakkerij en banket' ?
-            'Brood, Gebak en taart, Broodvervangers, Crackers en beschuit, Afbakbrood, Koek en cake, Toastcrackers, Koolhydraatarm en glutenvrij' :
-          mainCategory === 'Ontbijtgranen en beleg' ?
-            'Ontbijtgranen, Zoet beleg, Broodsalades, Hartig broodbeleg, Vleeswaren beleg, Kaas beleg, Cereals en muesli, Poeders, Halal beleg, Plantaardig zoet beleg, Ontbijtkoek, Beschuiten, Crackers' :
-          mainCategory === 'Snoep, koek en chocolade' ?
-            'Chocolade, Koeken, Drop, Snoepjes, Pepermunt en kauwgom, Zoete snacks, Bakken, Uitdeelzakken, Fruitbiscuit' :
-          mainCategory === 'Chips, popcorn en noten' ?
-            'Chips, Noten, Popcorn, Zoutjes, Toastjes' :
-          mainCategory === 'Tussendoortjes' ?
-            'Mueslirepen, Fruitsnacks, Notenrepen, Fruitrepen, Eiwitrepen, Ontbuitkoekrepen, Rijstwafels, Drinkboillon, Knackebrod' :
-          mainCategory === 'Frisdrank en sappen' ?
-            'Frisdrank, Water, Sap, Energie drink, Smooties, Siroop en limonade, Water met smaak, Ice tea, Drinkpakjes' :
-          mainCategory === 'Koffie en thee' ?
-            'Koffie, Thee' :
-          mainCategory === 'Bier, wijn en aperitieven' ?
-            'Bier, Wijn, Sterke drank, Speciaalbier, Alcoholvrij bier, Aperitieven en mixdranken' :
-          mainCategory === 'Pasta, rijst en wereldkeuken' ?
-            'Pasta, Rijst, Noedels en mie, Speciale voeding, Olie en azijn, Indonesisch, Italiaans en mediteriaans, Oosterse keuken, Maaltijdpakketten en mixen, Mexicaans, Hollandse keuken' :
-          mainCategory === 'Soepen, sauzen, kruiden en olie' ?
-            'Soepen, Sauzen, Kruiden, Conserven, Smaakmakers, Garnering' :
-          mainCategory === 'Sport en dieetvoeding' ?
-            'Supplementen en vitamines, Sportvoeding, Proteine poeder, Eiwitshakes, Dieetvoeding, Optiek, Zelfzorg' :
-          mainCategory === 'Diepvries' ?
-            'IJs, Diepvries pizza, Diepvries snacks, Diepvries aardappel, Diepvries vis en vlees, Diepvries gebak en bladerdeeg, Diepvries kant en klare maaltijden, Diepvries glutenvrij, Diepvries babyvoeding' :
-          mainCategory === 'Drogisterij' ?
-            'Lichaamsverzorging, Mondverzorging, Pijnstillers, Haarverzorging, Make up, Maandverband en tampons, Intimiteit' :
-          mainCategory === 'Baby en kind' ?
-            'Luiers en doekjes, Babyvoeding, Baby en kind verzorging, Zwangerschap, Baby gezondheid' :
-          mainCategory === 'Huishouden' ?
-            'Schoonmaakmiddelen, Wasmiddel en wasverzachters, Luchtverfrissers, Vaatwas en afwasmiddelen, Schoonmaak producten, Vuilniszakken en folies, Toiletpapier, Tissues en keukenpapier' :
-          mainCategory === 'Huisdier' ?
-            'Honden, Katten, Vissen, Knaagdieren, Vogels' :
-          'Koken en bakken'
-        }`;
+        ${getSubcategoriesForMainCategory(mainCategory).join(', ')}`;
 
         const subcategoryResult = await model.generateContent(subcategoryPrompt);
         const subcategoryText = subcategoryResult.response.text().trim();
@@ -367,11 +377,14 @@ export function AddProductDrawer({
         }
         // Fallback to basic categorization
         await fallbackToBasicCategorization(itemName);
+      } finally {
+        setIsAIProcessing(false);
       }
     } catch (error) {
       console.error('Error getting AI suggestions:', error);
       // Fallback to basic categorization
       await fallbackToBasicCategorization(itemName);
+      setIsAIProcessing(false);
     }
   };
 
@@ -392,6 +405,8 @@ export function AddProductDrawer({
         description: "Kon het product niet automatisch categoriseren. Kies handmatig een categorie.",
         variant: "destructive"
       });
+    } finally {
+      setIsAIProcessing(false);
     }
   };
 
@@ -595,9 +610,21 @@ export function AddProductDrawer({
     onClose();
   };
 
+  // Remove the drawer height calculation effect since we'll use the parent drawer height
+  useEffect(() => {
+    if (!isOpen) {
+      setShowCategoryScreen(false);
+    }
+  }, [isOpen]);
+
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
-      <DrawerContent className={cn("z-[600]", isDropdownOpen && "touch-none")}>
+      <DrawerContent 
+        className={cn(
+          "z-[600]", 
+          isDropdownOpen && "touch-none"
+        )}
+      >
         <div className="mx-auto w-full max-w-md">
           <div className="flex flex-col p-6">
             <div className="space-y-6">
@@ -727,59 +754,100 @@ export function AddProductDrawer({
                   />
                 </div>
 
-                <div className="space-y-2" ref={dropdownRef}>
-                  <Label htmlFor="category">Categorie</Label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className={cn(
-                        "flex items-center justify-between w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-                        isDropdownOpen && "ring-2 ring-ring ring-offset-2"
-                      )}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>{categoryEmojis[newItem.category as Category] || categoryEmojis['Overig']}</span>
-                        <span>{newItem.category}</span>
-                      </span>
-                      {isDropdownOpen ? (
-                        <ChevronUp className="h-4 w-4 opacity-50" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      )}
-                    </button>
-                    <AnimatePresence>
-                      {isDropdownOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 10 }}
-                          className="absolute w-full bottom-[calc(100%+4px)] rounded-xl border bg-white/80 backdrop-blur-sm shadow-lg"
-                        >
-                          <div className="max-h-[40vh] overflow-y-auto touch-pan-y">
-                            {CATEGORIES.map((category) => (
-                              <button
-                                key={category}
-                                type="button"
-                                onClick={() => {
-                                  onItemChangeRef.current({ ...newItem, category: category as Category });
-                                  setIsDropdownOpen(false);
-                                }}
-                                className={cn(
-                                  "flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-gray-100/80",
-                                  newItem.category === category && "bg-gray-100/80"
-                                )}
-                              >
-                                <span>{categoryEmojis[category as Category] || categoryEmojis['Overig']}</span>
-                                <span>{category}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category" className="flex items-center gap-2">
+                    Categorie
+                    <span className="text-xs text-gray-500 font-normal">(klik om zelf te kiezen)</span>
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryScreen(true)}
+                    className="flex items-center justify-between w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-gray-50 hover:border-gray-300 transition-colors group"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{categoryEmojis[newItem.category as Category]}</span>
+                      <span>{newItem.category}</span>
+                    </span>
+                    <span className="text-xs text-gray-400 group-hover:text-gray-600">Wijzigen</span>
+                  </button>
                 </div>
+
+                <AnimatePresence>
+                  {showCategoryScreen && (
+                    <CategorySelectionScreen
+                      selectedCategory={newItem.category as Category}
+                      onSelectCategory={async (category) => {
+                        // First update the category immediately for UI responsiveness
+                        onItemChangeRef.current({ ...newItem, category });
+                        setShowCategoryScreen(false);
+
+                        // Then regenerate the subcategory if we have a product name
+                        if (newItem.name) {
+                          setIsAIProcessing(true);
+                          console.log('Starting subcategory regeneration for:', {
+                            itemName: newItem.name,
+                            newCategory: category,
+                            previousCategory: newItem.category,
+                            previousSubcategory: newItem.subcategory
+                          });
+
+                          try {
+                            const subcategoryPrompt = `Given the Dutch grocery item "${newItem.name}" which belongs to the main category "${category}", determine:
+                            1. The most appropriate subcategory from the list below
+                            2. An appropriate emoji for this item
+
+                            Return as JSON:
+                            {
+                              "subcategory": "subcategory name",
+                              "emoji": "emoji"
+                            }
+
+                            Available subcategories for ${category}:
+                            ${getSubcategoriesForMainCategory(category).join(', ')}`;
+
+                            console.log('Sending subcategory prompt to AI:', subcategoryPrompt);
+
+                            const subcategoryResult = await model.generateContent(subcategoryPrompt);
+                            const subcategoryText = subcategoryResult.response.text().trim();
+                            console.log('Received raw AI response:', subcategoryText);
+
+                            const subcategoryData = JSON.parse(subcategoryText.replace(/```json\n?|\n?```/g, '').trim());
+                            console.log('Parsed subcategory data:', subcategoryData);
+
+                            // Update with new subcategory and emoji
+                            const updatedItem = {
+                              ...newItem,
+                              category,
+                              subcategory: subcategoryData.subcategory ?? null,
+                              emoji: subcategoryData.emoji
+                            };
+                            console.log('Updating item with new data:', updatedItem);
+
+                            onItemChangeRef.current(updatedItem);
+                          } catch (error) {
+                            console.error('Error regenerating subcategory:', error);
+                            if (error instanceof Error) {
+                              console.error('Error details:', {
+                                message: error.message,
+                                stack: error.stack
+                              });
+                            }
+                            toast({
+                              title: "Info",
+                              description: "Kon geen subcategorie bepalen voor deze combinatie.",
+                            });
+                          } finally {
+                            console.log('Finished subcategory regeneration process');
+                            setIsAIProcessing(false);
+                          }
+                        } else {
+                          console.log('Skipping subcategory regeneration - no item name provided');
+                        }
+                      }}
+                      onBack={() => setShowCategoryScreen(false)}
+                    />
+                  )}
+                </AnimatePresence>
 
                 <div className="space-y-2">
                   <Label htmlFor="quantity">Hoeveelheid (optioneel)</Label>
@@ -805,9 +873,22 @@ export function AddProductDrawer({
 
                 <Button
                   onClick={handleButtonClick}
+                  disabled={isAIProcessing || !newItem.name || isTyping}
                   className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl py-6"
                 >
-                  Product Toevoegen
+                  {isAIProcessing ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Categoriseren...</span>
+                    </div>
+                  ) : isTyping ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Wachten op invoer...</span>
+                    </div>
+                  ) : (
+                    "Product Toevoegen"
+                  )}
                 </Button>
               </div>
                 </>

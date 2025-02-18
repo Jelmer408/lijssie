@@ -1621,7 +1621,7 @@ const MainPage = () => {
         user={user}
         household={household}
         isOnline={true}
-        isDialogOpen={isProductDrawerOpen}
+        isDialogOpen={activeView === 'finance' ? false : isProductDrawerOpen}
         setIsDialogOpen={setIsProductDrawerOpen}
         isHouseholdModalOpen={isHouseholdModalOpen}
         setIsHouseholdModalOpen={setIsHouseholdModalOpen}
@@ -1632,7 +1632,7 @@ const MainPage = () => {
           stores: optimalStores,
           totalPrice: calculateTotalPrice()
         } : null}
-        isAddProductDrawerOpen={isAddProductDrawerOpen}
+        isAddProductDrawerOpen={activeView === 'finance' ? false : isAddProductDrawerOpen}
         setIsAddProductDrawerOpen={setIsAddProductDrawerOpen}
       />
 
@@ -1640,15 +1640,18 @@ const MainPage = () => {
         {renderMainContent()}
       </main>
 
-      <ProductSelectionDrawer
-        isOpen={isProductDrawerOpen}
-        onClose={() => setIsProductDrawerOpen(false)}
-        itemName={selectedItem?.name || ''}
-        itemId={selectedItem?.id || ''}
-        itemSubcategory={selectedItem?.subcategory || null}
-        onProductSelect={handleProductSelect}
-        selectedStores={selectedStores}
-      />
+      {/* Only render ProductSelectionDrawer when not in finance view */}
+      {activeView !== 'finance' && (
+        <ProductSelectionDrawer
+          isOpen={isProductDrawerOpen}
+          onClose={() => setIsProductDrawerOpen(false)}
+          itemName={selectedItem?.name || ''}
+          itemId={selectedItem?.id || ''}
+          itemSubcategory={selectedItem?.subcategory || null}
+          onProductSelect={handleProductSelect}
+          selectedStores={selectedStores}
+        />
+      )}
 
       <Navbar 
         activeView={activeView}

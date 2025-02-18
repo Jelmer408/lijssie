@@ -177,6 +177,13 @@ export function FinanceView({ isAddExpenseOpen, setIsAddExpenseOpen }: FinanceVi
   const [previousDrawerState, setPreviousDrawerState] = useState(false);
   const [expandedReceipts, setExpandedReceipts] = useState<Set<string>>(new Set());
 
+  // Reset form when drawer is closed
+  useEffect(() => {
+    if (!isAddExpenseOpen) {
+      resetForm();
+    }
+  }, [isAddExpenseOpen]);
+
   // Fetch current user when component mounts
   useEffect(() => {
     const fetchCurrentUser = async () => {
