@@ -353,7 +353,7 @@ export function TrackedProductsList({ householdId, className }: TrackedProductsL
           </div>
           <div className="min-w-0">
             <h2 className="font-semibold text-gray-900 text-lg">
-              Getrackte producten
+              Gevolgde producten
             </h2>
           </div>
         </div>
